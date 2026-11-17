@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Keeps self-hosted n8n running locally (http://localhost:5678). -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.dva.n8n</string>
+  <key>ProgramArguments</key>
+  <array><string>/bin/zsh</string><string>-lc</string><string>n8n start</string></array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>GENERIC_TIMEZONE</key><string>Asia/Kolkata</string>
+    <key>TZ</key><string>Asia/Kolkata</string>
+    <!-- n8n 2.x disables the Execute Command node by default; this re-enables it (local, single-user). -->
+    <key>NODES_EXCLUDE</key><string>[]</string>
+    <key>N8N_RUNNERS_ENABLED</key><string>true</string>
+    <key>N8N_DIAGNOSTICS_ENABLED</key><string>false</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>__PROJECT_DIR__/data/logs/n8n.out.log</string>
+  <key>StandardErrorPath</key><string>__PROJECT_DIR__/data/logs/n8n.err.log</string>
+</dict>
+</plist>

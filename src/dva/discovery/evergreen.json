@@ -1,0 +1,23 @@
+{
+  "animals": ["Octopus", "Tardigrade", "Axolotl", "Mantis shrimp", "Immortal jellyfish", "Platypus", "Pistol shrimp",
+              "Greenland shark", "Honey badger", "Electric eel", "Arctic tern", "Bombardier beetle", "Lyrebird",
+              "Naked mole-rat", "Archerfish", "Wood frog", "Sea otter", "Pufferfish", "Hummingbird", "Cuttlefish"],
+  "space": ["Neutron star", "Olympus Mons", "Voyager 1", "Great Red Spot", "Black hole", "Saturn's rings", "Enceladus",
+            "Oumuamua", "Kuiper belt", "Chandrayaan-3", "Mangalyaan", "Venus", "Pulsar", "Sunspot", "Europa (moon)"],
+  "science": ["Bioluminescence", "Supercooling", "Triboluminescence", "Petrichor", "Ball lightning", "Leidenfrost effect",
+              "Mpemba effect", "Superfluidity", "Piezoelectricity", "Aurora", "Glass", "Tetrachromacy", "Diamond"],
+  "technology": ["Transistor", "Fiber-optic communication", "Global Positioning System", "QR code", "Lithium-ion battery",
+                 "Submarine communications cable", "Atomic clock", "3D printing", "Barcode", "Velcro", "Microwave oven"],
+  "history": ["Iron pillar of Delhi", "Library of Alexandria", "Great Wall of China", "Indus Valley Civilisation",
+              "Antikythera mechanism", "Rosetta Stone", "Konark Sun Temple", "Nalanda mahavihara", "Taj Mahal",
+              "Terracotta Army", "Stepwell", "Jantar Mantar, Jaipur", "Kailasa temple, Ellora", "Machu Picchu"],
+  "psychology": ["Placebo", "Dunning–Kruger effect", "Mandela effect", "Déjà vu", "Baader–Meinhof phenomenon",
+                 "Zeigarnik effect", "Pareidolia", "Bystander effect", "Spacing effect", "Cocktail party effect",
+                 "Ben Franklin effect", "Serial-position effect"],
+  "geography": ["Mariana Trench", "Mawsynram", "Lake Baikal", "Dead Sea", "Sundarbans", "Lonar Lake", "Sahara",
+                "Mount Everest", "Amazon River", "Danakil Depression", "Point Nemo", "Rann of Kutch", "Living root bridge"],
+  "mysteries": ["Roopkund", "Voynich manuscript", "Bermuda Triangle", "Nazca Lines", "Wow! signal", "Stonehenge",
+                "Sailing stones", "Tunguska event", "Dancing plague of 1518", "Baghdad Battery"],
+  "discoveries": ["Penicillin", "X-ray", "Cosmic microwave background", "Coelacanth", "Higgs boson",
+                  "Gravitational wave", "CRISPR", "Lucy (Australopithecus)", "Microwave oven", "Post-it Note"]
+}

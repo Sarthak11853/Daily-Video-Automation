@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dva"
+version = "0.1.0"
+description = "Daily AI animated facts video automation (Hinglish, 3D cartoon, Shorts/Reels)"
+requires-python = ">=3.10"
+dependencies = [
+  "requests>=2.31",
+  "PyYAML>=6.0",
+  "numpy>=1.26",
+  "Pillow>=10.0",
+]
+
+[project.optional-dependencies]
+tts = ["piper-tts>=1.3"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+dva = "dva.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+dva = ["render/blender/*.py", "script/prompts/*.txt", "demo/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

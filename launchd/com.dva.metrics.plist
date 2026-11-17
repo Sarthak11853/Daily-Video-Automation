@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Alternative to n8n: collect performance metrics every 6 hours. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.dva.metrics</string>
+  <key>WorkingDirectory</key><string>__PROJECT_DIR__</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__PROJECT_DIR__/.venv/bin/python</string><string>-m</string><string>dva</string><string>metrics</string>
+  </array>
+  <key>StartInterval</key><integer>21600</integer>
+  <key>StandardOutPath</key><string>__PROJECT_DIR__/data/logs/metrics.out.log</string>
+  <key>StandardErrorPath</key><string>__PROJECT_DIR__/data/logs/metrics.err.log</string>
+</dict>
+</plist>
