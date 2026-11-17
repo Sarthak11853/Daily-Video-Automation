@@ -56,7 +56,15 @@ def test_prompt_package_sent(cfg, db):
     assert not (out / "voiceover.wav").exists() and not (out / "subtitles.srt").exists()
     texts = [m[1] for m in tg.sent if m[0] == "msg"]
     assert any("<pre>" in t for t in texts)
-    assert any("VERIFIED FACTS" in t for t in texts) and any("SUGGESTED HINGLISH SCRIPT" in t for t in texts)
+    assert any("VERIFIED FACTS" in t for t in texts) and any("VOICEOVER SCRIPT (easy English" in t for t in texts)
+    music = next(t for t in texts if "Background music" in t)
+    assert "playful orchestral" in music and "110 BPM" in music and "playful pizzicato" in music
+    assert all("Background music (if your tool makes audio): playful orchestral" in c["prompt"]
+               for s in pkg["scenes"] for c in s["clips"])
+    assert pkg["scenes"][0]["music_cue"] == "gentle build"
+    auto = [t for t in texts if "posted for #" in t][-1]
+    assert "YouTube tags: tardigrade facts" in auto
+    assert "## Background music" in (out / "PROMPTS.md").read_text()
     assert all(len(t) <= 4096 for t in texts)
     last = [m for m in tg.sent if m[0] == "msg"][-1]
     assert last[2]["inline_keyboard"][0][0]["callback_data"] == f"regen:{res['video_id']}"
@@ -82,7 +90,18 @@ def test_your_video_and_caption_published_untouched(cfg, db, tmp_path):
     assert "not waiting" in FootageProcessor(pipe).process(res["video_id"], [clip])
 
 
-def test_video_without_caption_waits_then_text_publishes(cfg, db, tmp_path):
+def test_video_without_caption_gets_automatic_caption(cfg, db, tmp_path):
+    pipe, res = _run_prompt(cfg, db)
+    msg = FootageProcessor(pipe).process(res["video_id"], [make_clip(tmp_path / "auto.mp4", 6)])
+    v = db.get_video(res["video_id"])
+    meta = json.loads(v["metadata_json"])
+    assert v["status"] == "published" and "automatic caption" in msg
+    assert meta["caption_source"] == "automatic" and meta["youtube"]["tags"][0] == "tardigrade facts"
+    assert "Tardigrades are tiny but tough" in meta["instagram"]["caption"]
+
+
+def test_yours_only_waits_then_text_publishes(cfg, db, tmp_path):
+    cfg.data["prompt_mode"]["caption_source"] = "yours_only"
     tg = FakeTelegram()
     pipe, res = _run_prompt(cfg, db, tg)
     bot = _sync(ApprovalBot(pipe))
@@ -98,12 +117,13 @@ def test_video_without_caption_waits_then_text_publishes(cfg, db, tmp_path):
 
 
 def test_suggested_caption_button(cfg, db, tmp_path):
+    cfg.data["prompt_mode"]["caption_source"] = "yours_only"
     pipe, res = _run_prompt(cfg, db)
     FootageProcessor(pipe).process(res["video_id"], [make_clip(tmp_path / "a.mp4", 6)])
     bot = _sync(ApprovalBot(pipe))
     bot.handle_callback({"id": "1", "data": f"autocap:{res['video_id']}", "message": {"chat": {"id": 42}, "message_id": 3}})
     v = db.get_video(res["video_id"])
-    assert v["status"] == "published" and json.loads(v["metadata_json"])["caption_source"] == "suggested"
+    assert v["status"] == "published" and json.loads(v["metadata_json"])["caption_source"] == "automatic"
 
 
 def test_caption_sent_before_video(cfg, db, tmp_path):

@@ -33,9 +33,13 @@ def build_metadata(script: dict, sheet: FactSheet, cfg, mode: str | None = None)
     yt_desc = (f"{script.get('youtube_description', '').strip()}\n\n"
                f"📚 Sources:\n{src_lines}\n\n{disclosure}\n\n{' '.join(tags[:12])}")
     yt_desc = yt_desc.replace("<", "").replace(">", "")[:4900]
+    lang = cfg.get("channel.language", "english")
+    extra = ["facts", "did you know", "fun facts"] if lang == "english" else ["hindi facts", "hinglish"]
     yt_tags, total = [], 0
-    for t in tags + [sheet.topic, sheet.category, "hindi facts", "hinglish"]:
-        t = t.lstrip("#")
+    for t in [*script.get("youtube_tags", []), sheet.topic, sheet.category, *extra, *(x.lstrip("#") for x in tags)]:
+        t = str(t).lstrip("#").strip()
+        if not t or t.lower() in (x.lower() for x in yt_tags):
+            continue
         if total + len(t) + 1 > 450:
             break
         yt_tags.append(t)
@@ -45,11 +49,13 @@ def build_metadata(script: dict, sheet: FactSheet, cfg, mode: str | None = None)
                   f"📚 Sources: {src_domains}\n\n{' '.join(tags[:25])}")[:2150]
     return {
         "youtube": {"title": yt_title, "description": yt_desc, "tags": yt_tags,
+                    "language": "en" if lang == "english" else "hi",
                     "contains_synthetic_media": bool(cfg.get("prompt_mode.contains_synthetic_media", True))
                     if mode == "prompt" else bool(cfg.get("publish.youtube.contains_synthetic_media", False))},
         "instagram": {"caption": ig_caption},
         "title": script.get("title") or sheet.topic,
         "hashtags": tags,
+        "caption_source": "automatic",
     }
 
 
@@ -81,6 +87,7 @@ def metadata_from_caption(caption: str, fallback: dict, cfg, sources: list | Non
         warnings.append("more than 30 hashtags: Instagram may reject the post")
     return {
         "youtube": {"title": title, "description": desc.replace("<", "").replace(">", "")[:4900], "tags": yt_tags,
+                    "language": fallback["youtube"].get("language", "en"),
                     "contains_synthetic_media": fallback["youtube"].get("contains_synthetic_media", False)},
         "instagram": {"caption": text[:2200]},
         "title": fallback.get("title"), "hashtags": ["#" + t for t in tags],

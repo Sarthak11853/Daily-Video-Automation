@@ -5,7 +5,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PROJECT_DIR="$(pwd)"
-VOICE="${DVA_VOICE:-hi_IN-pratham-medium}"
+if grep -qE '^\s*language:\s*hinglish' config/settings.yaml; then VOICE="${DVA_VOICE:-hi_IN-pratham-medium}";
+else VOICE="${DVA_VOICE:-en_US-lessac-medium}"; fi
 
 say() { printf "\n\033[1;36m==> %s\033[0m\n" "$*"; }
 

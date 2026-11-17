@@ -14,7 +14,7 @@ from ..llm.base import LLMChain
 log = logging.getLogger(__name__)
 
 RANK_SYSTEM = ("You are the research editor of a family-friendly Indian YouTube Shorts / Instagram Reels channel "
-               "that explains surprising, verifiable facts in Hinglish. You pick topics that can be backed by "
+               "that explains surprising, verifiable facts in simple words. You pick topics that can be backed by "
                "encyclopaedic or scientific sources. You never pick politics, tragedies, crime, celebrities, "
                "medical advice, or anything that is rumour or opinion.")
 

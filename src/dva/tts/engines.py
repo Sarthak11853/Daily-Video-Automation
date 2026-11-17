@@ -148,7 +148,10 @@ def pick_engine(cfg, root: Path) -> TTSEngine:
         cls = ENGINES.get(name)
         if not cls:
             continue
-        eng = cls(cfg.section(f"tts.{name}"), root)
+        section = cfg.section(f"tts.{name}")
+        if cfg.get("channel.language", "english") == "english" and section.get("voice_english"):
+            section["voice"] = section["voice_english"]
+        eng = cls(section, root)
         if eng.available():
             log.info("TTS engine: %s", name)
             return eng

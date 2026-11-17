@@ -9,9 +9,10 @@ channel:
   name: "Rochak Facts"            # shown in the outro / watermark
   handle: "@rochakfacts"
   mascot_name: "Gyaanu"           # the recurring 3D robot host (channel identity)
+  language: english               # english = easy, simple English (default) | hinglish
   timezone: "Asia/Kolkata"
   daily_time: "09:00"
-  default_hashtags: ["#facts", "#hindifacts", "#rochakfacts", "#didyouknow", "#science"]
+  default_hashtags: ["#facts", "#didyouknow", "#funfacts", "#learnsomethingnew"]
 
 workflow:
   # "prompt" (default): every morning you receive AI-video prompts + a ready voiceover for a verified,
@@ -42,10 +43,9 @@ prompt_mode:
   generate_voiceover: false        # true = also send a Hinglish TTS voiceover + .srt with the prompts
   add_branding: false              # true = burn the @handle watermark + progress bar into your video
   allow_silent_video: false        # false = a video with no sound is refused (probably a missing voiceover)
-  caption_source: yours_only       # yours_only: publish with YOUR caption; if a video arrives without one
-                                   #             the bot asks for it (or tap "use suggested caption")
-                                   # yours_or_generated: your caption if given, else the suggested one
-                                   # generated: always the system's suggested captions
+  caption_source: yours_or_generated  # caption, hashtags and YouTube tags are written automatically;
+                                   # if you type your own caption with the video, yours is used instead.
+                                   # generated: always automatic | yours_only: bot asks you for a caption
   append_sources_to_caption: false # true = add the verified sources under your YouTube description
   include_mascot: true             # recurring host character in every prompt = channel identity
   target_clip_seconds: 8           # most AI video tools make 5-10 s clips; long scenes get split
@@ -154,15 +154,18 @@ script:
 tts:
   engine_order: [piper, macos_say, espeak]
   piper:
-    voice: "hi_IN-pratham-medium"   # also try hi_IN-priyamvada-medium (female)
+    voice: "hi_IN-pratham-medium"   # Hinglish voice (also: hi_IN-priyamvada-medium)
+    voice_english: "en_US-lessac-medium"
     length_scale: 0.92              # < 1.0 = slightly faster, more energetic
     noise_scale: 0.6
     sentence_silence: 0.15
   macos_say:
     voice: "Lekha"
+    voice_english: "Samantha"
     rate: 185
   espeak:
     voice: "hi"
+    voice_english: "en-us"
     speed: 160
 
 render:

@@ -1,4 +1,4 @@
-"""Turn a verified Hinglish script into copy-paste prompts for any AI video
+"""Turn a verified script into copy-paste prompts for any AI video
 generator (Veo, Sora, Kling, Hailuo, Runway, Pika, Meta AI, …).
 
 Every shot prompt is self-contained (style + recurring character are repeated)
@@ -42,12 +42,49 @@ Return JSON:
      "shot": "60-90 word visual prompt: subject + setting + action + camera move + lighting + mood. Describe the
               host character's action if present. No text/letters in the image.",
      "camera": "one short phrase, e.g. 'slow dolly in', 'orbit left', 'crane down'",
-     "transition_hint": "how this shot should end to cut smoothly into the next"}}
+     "transition_hint": "how this shot should end to cut smoothly into the next",
+     "music_cue": "what the background music does in this shot, e.g. 'soft build-up', 'beat drop on the reveal'"}}
  ],
  "thumbnail_prompt": "a single striking still image prompt for the cover frame",
- "music_mood": "3-6 words describing background music"
+ "music": {{
+   "genre": "e.g. playful orchestral pizzicato / lo-fi hip hop / cinematic synth",
+   "mood": "3-6 words",
+   "tempo_bpm": 100,
+   "instruments": "main instruments",
+   "energy": "how the energy should move across the video (hook → reveal → ending)",
+   "search_keywords": "3-5 words to search in a royalty-free library (CapCut, YouTube Audio Library)",
+   "avoid": "what NOT to use (e.g. vocals/lyrics that clash with the voiceover)"
+ }}
 }}
+The music must suit the topic and stay under the voiceover (instrumental, no lyrics).
 Return exactly {n} scenes with ids {ids}."""
+
+
+MUSIC_BY_CATEGORY = {
+    "space": ("cinematic ambient synth", "wonder, vast, mysterious, hopeful", 90, "warm synth pads, soft piano, light pulses"),
+    "animals": ("playful orchestral", "curious, bouncy, cheerful", 110, "pizzicato strings, marimba, light percussion"),
+    "science": ("upbeat electronic", "curious, bright, clever", 115, "plucky synths, claps, soft bass"),
+    "technology": ("modern electronic", "futuristic, sleek, energetic", 120, "synth arps, crisp drums, bass"),
+    "history": ("epic orchestral", "grand, adventurous, warm", 95, "strings, taiko drums, brass swells"),
+    "psychology": ("lo-fi chill", "thoughtful, calm, intriguing", 85, "mellow keys, vinyl texture, soft beat"),
+    "geography": ("world adventure", "adventurous, open, uplifting", 105, "acoustic guitar, hand percussion, flute"),
+    "mysteries": ("dark cinematic", "suspenseful, eerie, curious", 80, "low drones, ticking clock, soft piano"),
+    "discoveries": ("inspiring cinematic", "uplifting, curious, triumphant", 100, "piano, strings, building drums"),
+}
+
+
+def default_music(category: str | None) -> dict:
+    genre, mood, bpm, inst = MUSIC_BY_CATEGORY.get((category or "").lower(), MUSIC_BY_CATEGORY["science"])
+    return {"genre": genre, "mood": mood, "tempo_bpm": bpm, "instruments": inst,
+            "energy": "soft and curious under the hook, builds through the story, small lift on the big reveal, "
+                      "warm resolve at the ending",
+            "search_keywords": f"{genre} {mood.split(',')[0]}",
+            "avoid": "vocals or lyrics (they clash with the voiceover); loud drops that bury the voice"}
+
+
+def music_line(m: dict) -> str:
+    return (f"{m.get('genre', '')}, {m.get('mood', '')}, ~{m.get('tempo_bpm', '')} BPM, "
+            f"{m.get('instruments', '')}, instrumental, no vocals")
 
 
 def _fmt_facts(sheet: FactSheet) -> str:
@@ -82,8 +119,9 @@ class VideoPromptWriter:
         got = {int(s.get("id", -1)): s for s in res.get("scenes", []) if isinstance(s, dict) and s.get("shot")}
         if set(got) != set(ids):
             raise ValueError(f"prompt writer returned scenes {sorted(got)} for {ids}")
+        music = res.get("music") if isinstance(res.get("music"), dict) else {}
         return {"scenes": got, "thumbnail_prompt": res.get("thumbnail_prompt", ""),
-                "music_mood": res.get("music_mood", "")}
+                "music": {**default_music(sheet.category), **{k: v for k, v in music.items() if v}}}
 
     def _template_shot(self, s: dict) -> dict:
         """Deterministic fallback when no LLM is available."""
@@ -113,7 +151,7 @@ class VideoPromptWriter:
             log.warning("video prompt LLM failed (%s); using template prompts", exc)
             source = "template"
             data = {"scenes": {s["id"]: self._template_shot(s) for s in script["scenes"]},
-                    "thumbnail_prompt": "", "music_mood": "upbeat curious playful"}
+                    "thumbnail_prompt": "", "music": default_music(sheet.category)}
         prefix = self.style + (f" Recurring character: {self.mascot}." if self.mascot else "")
         scenes, clip_no = [], 0
         for s in script["scenes"]:
@@ -126,30 +164,56 @@ class VideoPromptWriter:
                 cont = "" if len(parts) == 1 else (f" (Part {k}/{len(parts)} of this shot; continue the same action"
                                                    " and composition seamlessly.)")
                 full = (f"{prefix} SHOT: {shot['shot']} Camera: {shot.get('camera', 'smooth motion')}."
-                        f"{cont} Duration {d:.1f} seconds, vertical 9:16, no text on screen.")
+                        f"{cont} Duration {d:.1f} seconds, vertical 9:16, no text on screen, no dialogue."
+                        f" Background music (if your tool makes audio): {music_line(data['music'])}.")
                 clips.append({"clip": clip_no, "seconds": d, "prompt": full})
             scenes.append({"id": s["id"], "seconds": round(dur, 2), "voiceover": s["narration_display"],
                            "voiceover_devanagari": s.get("narration_tts", ""), "on_screen_text": s.get("on_screen_text", ""),
                            "shot": shot["shot"], "camera": shot.get("camera", ""),
-                           "transition_hint": shot.get("transition_hint", ""), "clips": clips})
+                           "transition_hint": shot.get("transition_hint", ""),
+                           "music_cue": shot.get("music_cue") or _default_cue(s, script), "clips": clips})
         thumb = data.get("thumbnail_prompt") or (f"{prefix} Eye-catching cover image about {sheet.topic}: "
                                                   f"{script['scenes'][0].get('visual_description', '')}")
         return {
             "source": source, "style_bible": self.style, "character": self.mascot, "negative_prompt": self.negative,
             "total_seconds": round(sum(durations.get(s["id"], 6.0) for s in script["scenes"]), 1),
-            "music_mood": data.get("music_mood", ""), "thumbnail_prompt": thumb, "scenes": scenes,
-            "single_prompt": self.single_prompt(scenes, sheet),
+            "music": data["music"], "thumbnail_prompt": thumb, "scenes": scenes,
+            "single_prompt": self.single_prompt(scenes, sheet, data["music"]),
         }
 
-    def single_prompt(self, scenes: list[dict], sheet: FactSheet) -> str:
+    def single_prompt(self, scenes: list[dict], sheet: FactSheet, music: dict | None = None) -> str:
         """One long prompt for tools that generate a whole ~60 s video in one go."""
         lines = [f"{self.style}", f"Recurring character: {self.mascot}." if self.mascot else "",
                  f"A ~{sum(s['seconds'] for s in scenes):.0f}-second vertical 9:16 animated explainer about "
                  f"{sheet.topic}, in {len(scenes)} shots:"]
         for s in scenes:
             lines.append(f"Shot {s['id']} ({s['seconds']:.0f}s): {s['shot']} Camera: {s['camera']}.")
-        lines.append("No text or logos on screen.")
+        lines.append("No text or logos on screen, no dialogue.")
+        if music:
+            lines.append(f"Background music: {music_line(music)}; energy: {music.get('energy', '')}.")
         return " ".join(x for x in lines if x)
+
+
+def _default_cue(scene: dict, script: dict) -> str:
+    ids = [s["id"] for s in script["scenes"]]
+    i = ids.index(scene["id"]) if scene["id"] in ids else 0
+    if i == 0:
+        return "start quiet and curious; tiny hit on the first word"
+    if i == len(ids) - 1:
+        return "warm, satisfying resolve; let it ring out after the last line"
+    if (scene.get("sfx") in ("ding", "boom", "sparkle")) or scene.get("mascot_action") == "surprised":
+        return "small lift / accent on the reveal"
+    return "steady groove under the voice"
+
+
+def music_markdown(m: dict) -> list[str]:
+    return [f"- **Genre:** {m.get('genre', '')}", f"- **Mood:** {m.get('mood', '')}",
+            f"- **Tempo:** ~{m.get('tempo_bpm', '')} BPM", f"- **Instruments:** {m.get('instruments', '')}",
+            f"- **Energy:** {m.get('energy', '')}", f"- **Search for:** {m.get('search_keywords', '')}",
+            f"- **Avoid:** {m.get('avoid', '')}",
+            "- Tip: add ONE track for the whole video in your editor (e.g. CapCut → Audio → search the words "
+            "above), keep it ~15–20 dB below the voiceover, fade in/out. Use only royalty-free / in-app library "
+            "music so the post isn't muted or claimed."]
 
 
 def prompts_markdown(pkg: dict, script: dict, sheet: FactSheet, meta: dict, video_id: int,
@@ -167,21 +231,22 @@ def prompts_markdown(pkg: dict, script: dict, sheet: FactSheet, meta: dict, vide
            "inbox folder with the caption in a .txt file of the same name. It is published exactly as you made it.",
            "", "## Style (already included in every prompt)", "", pkg["style_bible"], "",
            f"**Character:** {pkg['character'] or '—'}", "", f"**Negative prompt:** {pkg['negative_prompt']}", "",
-           f"**Music mood:** {pkg.get('music_mood', '')}", "", "## Clips", ""]
+           "## Background music", "", *music_markdown(pkg.get("music") or {}), "", "## Clips", ""]
     for s in pkg["scenes"]:
         out += [f"### Scene {s['id']} · {s['seconds']:.1f}s · on-screen text: {s['on_screen_text'] or '—'}",
-                f"> 🗣 {s['voiceover']}", ""]
+                f"> 🗣 {s['voiceover']}", "", f"🎵 {s.get('music_cue', '')}", ""]
         for c in s["clips"]:
             out += [f"**Clip {c['clip']} ({c['seconds']:.1f}s)**", "```", c["prompt"], "```", ""]
     out += ["## Single prompt (long-video tools)", "```", pkg["single_prompt"], "```", "",
             "## Thumbnail prompt", "```", pkg["thumbnail_prompt"], "```", "",
-            "## Suggested Hinglish script (optional)", ""] + [f"{s['id']}. ({s['seconds']:.0f}s) {s['voiceover']}"
+            "## Suggested script (optional)", ""] + [f"{s['id']}. ({s['seconds']:.0f}s) {s['voiceover']}"
                                                               for s in pkg["scenes"]]
     out += ["", "## Verified facts", ""] + [f"- {c.text}" for c in sheet.verified_claims]
     out += ["", "## Sources", ""] + [f"- {s.title}: {s.url}" for s in sheet.sources]
-    out += ["", "## Suggested captions (used only if you choose them)", "",
+    out += ["", "## Caption, hashtags and tags (posted automatically)", "",
             f"**YouTube title:** {meta['youtube']['title']}", "",
-            "```", meta["youtube"]["description"], "```", "", "**Instagram:**", "```", meta["instagram"]["caption"], "```"]
+            "```", meta["youtube"]["description"], "```", "", "**Instagram:**", "```", meta["instagram"]["caption"], "```",
+            "", f"**YouTube tags:** {', '.join(meta['youtube'].get('tags', []))}"]
     return "\n".join(out) + "\n"
 
 

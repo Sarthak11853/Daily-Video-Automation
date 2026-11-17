@@ -1,10 +1,10 @@
 {
-  "title": "Octopus ke 3 dil?!",
+  "title": "An octopus has 3 hearts?!",
   "hook_style": "question",
   "scenes": [
     {
-      "narration_display": "Kya aap jaante ho, ek jaanwar ke paas teen dil hote hain?",
-      "narration_tts": "क्या आप जानते हो, एक जानवर के पास तीन दिल होते हैं?",
+      "narration_display": "Did you know one animal has three hearts?",
+      "narration_tts": "Did you know one animal has three hearts?",
       "claim_ids": [
         "C1"
       ],
@@ -20,8 +20,8 @@
       "visual_description": "A glowing question mark and a big glossy red cartoon heart float over a deep-blue gradient stage, sparkles drifting around them."
     },
     {
-      "narration_display": "Milo octopus se! Iske paas ek nahi, do nahi, poore teen dil hain.",
-      "narration_tts": "मिलो ऑक्टोपस से! इसके पास एक नहीं, दो नहीं, पूरे तीन दिल हैं।",
+      "narration_display": "Meet the octopus, a clever sea animal! It does not have one heart. It has three!",
+      "narration_tts": "Meet the octopus, a clever sea animal! It does not have one heart. It has three!",
       "claim_ids": [
         "C1"
       ],
@@ -36,8 +36,8 @@
       "visual_description": "A friendly purple cartoon octopus with big shiny eyes waves its eight curly arms on a sunny coral reef, bubbles rising."
     },
     {
-      "narration_display": "Do dil sirf gills tak blood pump karte hain, aur teesra dil poori body ko blood bhejta hai.",
-      "narration_tts": "दो दिल सिर्फ़ गिल्स तक ब्लड पंप करते हैं, और तीसरा दिल पूरी बॉडी को ब्लड भेजता है।",
+      "narration_display": "Two small hearts push blood through its gills. The third heart sends blood to the rest of its body.",
+      "narration_tts": "Two small hearts push blood through its gills. The third heart sends blood to the rest of its body.",
       "claim_ids": [
         "C2"
       ],
@@ -53,8 +53,8 @@
       "visual_description": "Inside a translucent cartoon octopus, three glowing hearts pulse: two small ones beside the gills and one bigger one in the middle, soft x-ray style."
     },
     {
-      "narration_display": "Aur twist ye hai: jab octopus swim karta hai, toh ye teesra dil dhadakna band kar deta hai!",
-      "narration_tts": "और ट्विस्ट ये है: जब ऑक्टोपस स्विम करता है, तो ये तीसरा दिल धड़कना बंद कर देता है!",
+      "narration_display": "Now here is the surprise. When the octopus swims, that third heart stops beating!",
+      "narration_tts": "Now here is the surprise. When the octopus swims, that third heart stops beating!",
       "claim_ids": [
         "C3"
       ],
@@ -70,8 +70,8 @@
       "visual_description": "The cartoon octopus starts swimming with a jet of water; its big central heart dims and stops glowing while the two small hearts keep pulsing."
     },
     {
-      "narration_display": "Isliye octopus jaldi thak jaata hai, aur tairne ki jagah crawl karna pasand karta hai.",
-      "narration_tts": "इसलिए ऑक्टोपस जल्दी थक जाता है, और तैरने की जगह क्रॉल करना पसंद करता है।",
+      "narration_display": "So swimming makes it tired very fast. That is why an octopus likes to crawl instead.",
+      "narration_tts": "So swimming makes it tired very fast. That is why an octopus likes to crawl instead.",
       "claim_ids": [
         "C3"
       ],
@@ -86,8 +86,8 @@
       "visual_description": "The tired cartoon octopus sighs and happily crawls along the sandy seabed on its arms instead of swimming, seaweed swaying."
     },
     {
-      "narration_display": "Iska blood bhi laal nahi, neela hota hai, kyunki isme copper wala protein hemocyanin hota hai.",
-      "narration_tts": "इसका ब्लड भी लाल नहीं, नीला होता है, क्योंकि इसमें कॉपर वाला प्रोटीन हीमोसायनिन होता है।",
+      "narration_display": "Its blood is not red. It is blue! A protein with copper, called hemocyanin, carries the oxygen.",
+      "narration_tts": "Its blood is not red. It is blue! A protein with copper, called hemocyanin, carries the oxygen.",
       "claim_ids": [
         "C4"
       ],
@@ -103,8 +103,8 @@
       "visual_description": "Close-up of a glowing blue droplet of blood swirling in a playful cartoon lab, tiny copper-colored molecules sparkling inside it."
     },
     {
-      "narration_display": "Aur iske lagbhag 500 million neurons mein se do-tihaai, iski arms mein hote hain!",
-      "narration_tts": "और इसके लगभग पाँच सौ मिलियन न्यूरॉन्स में से दो-तिहाई, इसकी आर्म्स में होते हैं!",
+      "narration_display": "An octopus has about 500 million nerve cells. Two-thirds of them are in its arms!",
+      "narration_tts": "An octopus has about 500 million nerve cells. Two-thirds of them are in its arms!",
       "claim_ids": [
         "C5"
       ],
@@ -120,8 +120,8 @@
       "visual_description": "The octopus's arms light up with thousands of tiny glowing neurons, most of the sparkle running along the arms, a small glowing brain in the head."
     },
     {
-      "narration_display": "Aur iske suckers chhoo kar cheezon ka taste bhi le sakte hain!",
-      "narration_tts": "और इसके सकर्स छूकर चीज़ों का टेस्ट भी ले सकते हैं!",
+      "narration_display": "And its suckers can even taste the things they touch.",
+      "narration_tts": "And its suckers can even taste the things they touch.",
       "claim_ids": [
         "C6"
       ],
@@ -137,8 +137,8 @@
       "visual_description": "An octopus arm with round suckers touches a seashell; the suckers glow softly as if tasting it, the octopus looks delighted."
     },
     {
-      "narration_display": "Teen dil, neela khoon, aur smart arms. Nature sach mein genius hai! Aise aur facts ke liye follow karo!",
-      "narration_tts": "तीन दिल, नीला खून, और स्मार्ट आर्म्स। नेचर सच में जीनियस है! ऐसे और फ़ैक्ट्स के लिए फ़ॉलो करो!",
+      "narration_display": "Three hearts, blue blood and smart arms. Nature is amazing! Follow for more fun facts.",
+      "narration_tts": "Three hearts, blue blood and smart arms. Nature is amazing! Follow for more fun facts.",
       "claim_ids": [
         "C1",
         "C4",
@@ -157,17 +157,32 @@
       "visual_description": "Celebration on the reef: the octopus, three glowing hearts and confetti bubbles swirl together under bright light shafts."
     }
   ],
-  "youtube_title": "Octopus ke 3 dil aur neela khoon?! 🐙",
-  "youtube_description": "Octopus ke paas teen dil hote hain, blood neela hota hai aur zyada-tar neurons arms mein hote hain! Dekho kaise.",
-  "instagram_caption": "Octopus = 3 dil + neela khoon + smart arms 🐙💙\nTumhe kaunsa fact sabse crazy laga? Comment karo! 👇",
+  "youtube_title": "An Octopus Has 3 Hearts and Blue Blood?! 🐙",
+  "youtube_description": "Octopuses have three hearts, blue blood and arms full of nerve cells. Which fact surprised you most?",
+  "instagram_caption": "An octopus has THREE hearts 🐙💙\nOne of them even stops when it swims!\nIts blood is blue, and most of its nerve cells are in its arms.\nWhich fact surprised you most? 👇\nFollow for a new fun fact every day!",
   "hashtags": [
     "#octopus",
     "#animalfacts",
     "#oceanlife",
-    "#sciencefacts",
-    "#hindifacts",
-    "#factsinhindi",
+    "#sealife",
     "#marinebiology",
-    "#amazingfacts"
+    "#sciencefacts",
+    "#funfacts",
+    "#didyouknow",
+    "#facts",
+    "#natureisamazing",
+    "#learnsomethingnew"
+  ],
+  "youtube_tags": [
+    "octopus facts",
+    "octopus three hearts",
+    "why is octopus blood blue",
+    "octopus hearts",
+    "amazing animal facts",
+    "ocean animals",
+    "fun science facts",
+    "did you know facts",
+    "marine biology for kids",
+    "hemocyanin"
   ]
 }

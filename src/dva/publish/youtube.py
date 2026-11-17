@@ -125,8 +125,9 @@ class YouTube:
     def start_session(self, meta: dict, size: int) -> str:
         body = {
             "snippet": {"title": meta["title"], "description": meta["description"], "tags": meta.get("tags", []),
-                        "categoryId": str(self.y.get("category_id", "27")), "defaultLanguage": "hi",
-                        "defaultAudioLanguage": "hi"},
+                        "categoryId": str(self.y.get("category_id", "27")),
+                        "defaultLanguage": meta.get("language", "en"),
+                        "defaultAudioLanguage": meta.get("language", "en")},
             "status": {"privacyStatus": self.y.get("privacy_status", "public"),
                        "selfDeclaredMadeForKids": bool(self.y.get("made_for_kids", False)),
                        "containsSyntheticMedia": bool(meta.get("contains_synthetic_media",

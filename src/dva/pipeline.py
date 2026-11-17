@@ -284,9 +284,15 @@ class Pipeline:
         inbox = self.cfg.path("prompt_mode.inbox_dir", "inbox")
         demo = "🧪 DEMO CONTENT — facts hand-curated, re-check before publishing\n" if facts.get("demo") else ""
         we_add = self.cfg.get("prompt_mode.post_process", "none") != "none"
-        step3 = ("Keep it <b>silent</b>: I'll add the Hinglish voiceover, music and subtitles."
+        step3 = ("Keep it <b>silent</b>: I'll add the voiceover, music and subtitles."
                  if we_add and has_voice else
-                 "Add your voiceover and subtitles (suggested script below; use it or write your own).")
+                 "Add your voiceover (easy English script below), subtitles and the background music below.")
+        caption_mode = self.cfg.get("prompt_mode.caption_source", "yours_or_generated")
+        step4 = ("4. Send me the finished video as a <b>file</b> (≤ 20 MB). The caption, hashtags and YouTube tags "
+                 "are added automatically (type your own caption with the video only if you want to replace them)."
+                 if caption_mode != "yours_only" else
+                 "4. Send me the finished video as a <b>file</b> (≤ 20 MB) <b>with your caption</b> in the same "
+                 "message (or as text right after).")
         ids = tg.send_message(
             f"{demo}🎬 <b>Video #{video_id}: {escape(v['title'] or '')}</b>\n"
             f"📂 {escape(v['category'] or '')} · ⏱ ~{pkg['total_seconds']:.0f}s · {len(pkg['scenes'])} scenes · "
@@ -294,20 +300,32 @@ class Pipeline:
             "<b>What to do</b>\n1. Generate the clips below in your AI video tool (each prompt is complete, "
             "with style and character included).\n2. Edit them together.\n"
             f"3. {step3}\n"
-            "4. Send me the finished video as a <b>file</b> (≤ 20 MB) <b>with your caption</b> in the same message "
-            f"(or send the caption as text right after). Bigger than 20 MB? {escape(self.big_file_hint(video_id))}\n"
+            f"{step4} Bigger than 20 MB? {escape(self.big_file_hint(video_id))}\n"
             "I publish it to YouTube Shorts + Instagram Reels exactly as you made it.",
             parse_mode="HTML")
         claims = [c for c in facts["claims"] if c.get("verified")]
         ids += tg.send_message("✅ VERIFIED FACTS (safe to say in your voiceover)\n"
                                + "\n".join(f"• {c['text']}" for c in claims)
                                + "\n\n📚 SOURCES\n" + "\n".join(f"• {s['url']}" for s in facts["sources"]))
-        ids += tg.send_message("📜 SUGGESTED HINGLISH SCRIPT (optional)\n"
+        ids += tg.send_message("📜 VOICEOVER SCRIPT (easy English; use it or write your own)\n"
                                + "\n".join(f"{s['id']}. ({s['seconds']:.0f}s) {s['voiceover']}" for s in pkg["scenes"]))
+        m = pkg.get("music") or {}
+        if m:
+            ids += tg.send_message(
+                "🎵 <b>Background music</b>\n"
+                f"• Genre: {escape(str(m.get('genre', '')))}\n• Mood: {escape(str(m.get('mood', '')))}\n"
+                f"• Tempo: ~{escape(str(m.get('tempo_bpm', '')))} BPM\n"
+                f"• Instruments: {escape(str(m.get('instruments', '')))}\n"
+                f"• Energy: {escape(str(m.get('energy', '')))}\n"
+                f"• Search in CapCut / YouTube Audio Library: <code>{escape(str(m.get('search_keywords', '')))}</code>\n"
+                f"• Avoid: {escape(str(m.get('avoid', '')))}\n"
+                "Use one instrumental track for the whole video, ~15–20 dB under your voice. Only use royalty-free "
+                "or in-app library music, otherwise the post can be muted or claimed.", parse_mode="HTML")
         for s in pkg["scenes"]:
             head = (f"<b>Scene {s['id']} · {s['seconds']:.1f}s</b>"
                     + (f" · text: <b>{escape(s['on_screen_text'])}</b>" if s.get("on_screen_text") else "")
-                    + f"\n🗣 <i>{escape(s['voiceover'])}</i>\n")
+                    + f"\n🗣 <i>{escape(s['voiceover'])}</i>"
+                    + (f"\n🎵 {escape(s['music_cue'])}" if s.get("music_cue") else "") + "\n")
             body = ""
             for c in s["clips"]:
                 block = f"\n<b>Clip {c['clip']} ({c['seconds']:.1f}s)</b>\n<pre>{escape(c['prompt'])}</pre>"
@@ -322,7 +340,7 @@ class Pipeline:
             ids += tg.send_message(f"🎞 <b>Single prompt</b> (tools that make long videos)\n"
                                    f"<pre>{escape(pkg['single_prompt'])}</pre>", parse_mode="HTML")
         for name, cap in (("PROMPTS.md", "All prompts, script, facts, sources and captions"),
-                          ("voiceover_with_music.wav", "Hinglish voiceover + music (put under the video from 0:00)"),
+                          ("voiceover_with_music.wav", "Voiceover + music (put under the video from 0:00)"),
                           ("voiceover.wav", "Voice only"), ("subtitles.srt", "Subtitles (timed to the voiceover)")):
             f = out_dir / name
             if f.exists():
@@ -331,9 +349,10 @@ class Pipeline:
                 except Exception as exc:  # noqa: BLE001
                     log.warning("could not send %s: %s", name, exc)
         ids += tg.send_message(
-            f"💬 Suggested caption for #{video_id} (optional; your own caption is used if you send one)\n\n"
-            f"{meta['youtube']['title']}\n\n{meta['instagram']['caption'][:1500]}"
-            f"\n\n➡️ Reply to this message with your video + caption.",
+            f"💬 Caption, hashtags and tags that will be posted for #{video_id} (automatic)\n\n"
+            f"▶️ YouTube title: {meta['youtube']['title']}\n🏷 YouTube tags: {', '.join(meta['youtube'].get('tags', []))[:600]}"
+            f"\n\n📸 Instagram caption:\n{meta['instagram']['caption'][:1500]}"
+            f"\n\n➡️ Reply to this message with your finished video.",
             reply_markup=Telegram.prompt_keyboard(video_id))
         self.db.update_video(video_id, telegram_message_ids=json.dumps(ids))
 

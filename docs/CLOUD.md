@@ -6,7 +6,7 @@ optionally the **Google Drive** app) on your phone.
 ```
 GitHub Actions, every ~10 min (08:30–01:30 IST), hourly at night
   ├─ after 09:00 IST: find trending fact → verify → script → prompts → Telegram
-  ├─ your Telegram messages: video + caption → publish → reply with links
+  ├─ your Telegram messages: your video → publish with automatic caption/hashtags/tags → links
   ├─ your Google Drive "DVA Inbox" folder: videos > 20 MB → publish
   ├─ reminders if something waits for you
   └─ every 6 h: views/likes/shares → better topics
@@ -90,19 +90,28 @@ bot running on the Mac, and starts the first cloud run.
 1. **After 9:00 AM** Telegram shows today's video #N:
    - topic
    - verified facts and sources
-   - one message per scene with **tap-to-copy prompts**
+   - an **easy-English voiceover script** with seconds per scene
+   - a **🎵 background-music brief**: genre, mood, tempo, instruments, energy, and words to search in CapCut
+   - one message per scene with a **music cue** and **tap-to-copy prompts**
    - a single long prompt and a negative prompt
-   - a suggested script and suggested caption
-2. Make the clips in your AI video app, then edit them and add your voiceover and subtitles (e.g. in CapCut).
-   Export **vertical 9:16**.
-3. Send it to the bot **as a file** (📎 → File, not Gallery, so Telegram doesn't compress it), **with your
-   caption** in the same message, or as a text message right after.
-   - **Over 20 MB?** Upload it to the **DVA Inbox** folder in the Google Drive app and send the caption to the
-     bot as text. (Tip: exporting 1080p at a normal bitrate usually stays under 20 MB for a 60-second video.)
+   - the **caption, hashtags and YouTube tags** that will be posted automatically
+2. Make the clips in your AI video app. Then, in an editor like CapCut:
+   - put the clips in order
+   - record or generate the voiceover from the script
+   - add subtitles
+   - add one royalty-free track matching the music brief (CapCut → Audio → search the given words), quieter
+     than your voice
+
+   Export **vertical 9:16, 1080p**.
+3. Send **just the video** to the bot **as a file** (📎 → File, not Gallery, so Telegram doesn't compress it).
+   No caption needed: the automatic caption, hashtags and tags are used. Type a caption with the video only if you
+   want to replace the automatic one.
+   - **Over 20 MB?** Upload it to the **DVA Inbox** folder in the Google Drive app instead. (Tip: 1080p at a
+     normal bitrate usually stays under 20 MB for 60 seconds.)
 4. Within ~10 minutes the bot replies with the YouTube and Instagram links.
 
 Buttons and commands:
-- **🔁 New script & prompts**, **⏭ Skip this topic**, **💬 Use suggested caption** (if you sent no caption)
+- **🔁 New script & prompts**, **⏭ Skip this topic**
 - `/new`: a new topic now
 - `/pending`: resend what's waiting
 - `/status`

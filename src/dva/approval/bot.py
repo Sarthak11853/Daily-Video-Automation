@@ -16,8 +16,8 @@ from ..core.db import utcnow
 
 log = logging.getLogger(__name__)
 
-HELP = ("Send me your finished video (as a file) with your caption and I'll publish it.\n"
-        "A text message = caption for the video waiting for one.\n\n"
+HELP = ("Send me your finished video (as a file) and I'll publish it with an automatic caption, hashtags and tags.\n"
+        "Type a caption with the video only if you want to use your own.\n\n"
         "/status – latest runs & pending videos\n/new – make today's topic/prompts now\n"
         "/pending – resend what's waiting for you\n/prompts <id> – resend prompts for a video\n"
         "/skip <id> – drop a pending topic\n/metrics – performance summary\n/help – this message")

@@ -243,7 +243,7 @@ class FootageProcessor:
                 if mode == "voice_and_subtitles":
                     audio = build_audio(tl_fit, voice, script["scenes"], self.cfg, work, int(video_id) * 7919,
                                         sfx_enabled=False)
-                    notes.append("added Hinglish voiceover + music + subtitles")
+                    notes.append("added voiceover + music + subtitles")
                     has_sound = True
                 else:
                     notes.append("added subtitles over your audio")
@@ -307,9 +307,14 @@ class FootageProcessor:
         if v["status"] not in (from_status, "awaiting_caption", "processing_footage"):
             return f"#{video_id} is '{v['status']}'."
         meta = json.loads(v["metadata_json"])
-        meta["caption_source"] = "suggested"
+        meta["caption_source"] = "automatic"
         self.db.update_video(video_id, metadata_json=json.dumps(meta, ensure_ascii=False))
         return self._release(video_id, v["status"])
+
+    def _caption_note(self, video_id: int) -> str:
+        meta = json.loads(self.db.get_video(video_id)["metadata_json"])
+        src = "your caption" if meta.get("caption_source") == "yours" else "automatic caption + hashtags + tags"
+        return f"📝 Posted with {src}. Title: {meta['youtube']['title']}\n"
 
     def _release(self, video_id: int, status: str) -> str:
         if self.cfg.get("prompt_mode.confirm_before_publish", False):
@@ -319,4 +324,4 @@ class FootageProcessor:
             return "Check the preview and tap Publish."
         if not self.db.transition_video(video_id, (status,), "approved"):
             return f"#{video_id} changed state; not publishing."
-        return self.p.publish_approved(video_id)
+        return self._caption_note(video_id) + self.p.publish_approved(video_id)

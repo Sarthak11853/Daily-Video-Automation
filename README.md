@@ -1,26 +1,24 @@
 # Daily AI Animated Facts — ₹0/month Shorts & Reels factory
 
 Every morning at **9:00 AM IST** this system finds a trending or evergreen *interesting fact*,
-verifies it against trusted sources and writes a **Hinglish** script. What happens next depends on
+verifies it against trusted sources and writes a short script in **easy, simple English** (Hinglish is
+available as a setting). What happens next depends on
 `workflow.mode` in `config/settings.yaml`:
 
-### Prompt mode (default): you make the video, voiceover and captions; the system does the rest
+### Prompt mode (default): you make the video and voiceover; the system does everything else
 
-1. **9:00 AM, on Telegram:** today's trending topic, the **verified facts and sources** (safe to say in
-   your voiceover), and **copy-paste prompts for your AI video tool**: one prompt per clip (≤ 8 s each by
-   default), each repeating the channel style and the recurring host character so separately generated
-   clips still match. You also get a single long prompt, a negative prompt, a **suggested Hinglish script**
-   and a **suggested caption**. Both are optional; ignore them if you write your own.
-2. **You make everything:** video, voiceover, subtitles, caption.
-3. **Send it back:** the video **as a file** to the Telegram bot (≤ 20 MB) **with your caption** in the same
-   message (or as a text right after), or drop `N.mp4` + `N.txt` (caption) into the **inbox folder**
-   (any size; can be an iCloud Drive folder). Forgot the caption? The bot asks, with a one-tap
-   *Use suggested caption* option.
-4. **The system publishes it exactly as you made it** to **YouTube Shorts** and **Instagram Reels**. Your
-   caption is posted as written: first line = YouTube title, full text = YouTube description and
-   Instagram caption, and your hashtags also become YouTube tags. The file is only re-encoded if a platform
-   would reject it (e.g. not 9:16, wrong codec or frame rate); otherwise the original streams are kept.
-   A silent video is refused by default (missing voiceover?). It runs QC, uploads, and replies with the links.
+1. **9:00 AM, on Telegram:** today's trending topic, the **verified facts and sources**, an **easy-English
+   voiceover script**, a **background-music brief** (genre, mood, tempo, instruments, energy curve, words to
+   search in CapCut / YouTube Audio Library, with a music cue for each scene), and **copy-paste prompts for your AI video
+   tool**: one prompt per clip (≤ 8 s each by default), each repeating the channel style and the recurring host
+   character so separately generated clips still match. You also get a single long prompt and a negative prompt.
+2. **You make the video:** clips, edit, voiceover, subtitles, music.
+3. **Send it back:** just the video, **as a file**, to the Telegram bot (≤ 20 MB), or to the Google Drive / inbox
+   folder for bigger files.
+4. **The system publishes it** to **YouTube Shorts** and **Instagram Reels** exactly as you made it, with an
+   **automatically written caption, hashtags and YouTube tags** (shown to you in the morning message). To use
+   your own caption instead, type it with the video. The file is only re-encoded if a platform would reject it.
+   A silent video is refused (missing voiceover?). The bot replies with the links.
 
 Buttons on the daily message: *🔁 New script & prompts* and *⏭ Skip this topic*. Optional extras (TTS voiceover,
 auto subtitles, watermark, a preview before publishing) are in `prompt_mode` in `config/settings.yaml`, all off.
@@ -40,7 +38,7 @@ see **[docs/CLOUD.md](docs/CLOUD.md)**.
         │
         ▼
  Discover (Trends, RSS, Wikipedia, history) ─▶ Research & verify (quotes must match sources)
-        ─▶ Hinglish script + fact audit ─▶ Piper voiceover
+        ─▶ easy-English script + fact audit
                      │
       prompt mode ───┴──────────────────────────── full mode
         ▼                                             ▼
@@ -61,7 +59,7 @@ see **[docs/CLOUD.md](docs/CLOUD.md)**.
 | Topic discovery | Google Trends India RSS, NASA/ScienceDaily/BBC/ESA/… RSS, Wikipedia most-read & on-this-day, curated evergreen pool (`src/dva/discovery`) | public feeds |
 | De-duplication | SQLite history (365 days), keyword similarity, blacklist on reject | local |
 | Research & verification | Wikipedia API + its citations on trusted domains + the trend's own article; LLM must quote sources **verbatim**; quotes are string-matched, numbers cross-checked, core fact needs 2 independent domains; judge LLM checks entailment (`src/dva/research`) | Gemini free tier / local Ollama |
-| Script | Gemini writes hook (≤3 s) → story → reveal → ending + CTA, subtitles in Roman Hinglish and voice text in Devanagari; validator + second-pass fact audit, auto-rewrite (`src/dva/script`) | Gemini free tier |
+| Script | Gemini writes hook (≤3 s) → story → reveal → ending + CTA, easy English by default (Hinglish optional), plus automatic title/caption/hashtags/YouTube tags; validator + second-pass fact audit, auto-rewrite (`src/dva/script`) | Gemini free tier |
 | 3D animation | Blender scene builder: 12 environments, 41 procedural props, the mascot **Gyaanu** (consistent channel identity), 9 camera moves, 3D keyword text, ambient particles; EEVEE on Mac GPU, Cycles fallback (`src/dva/render/blender`) | Blender (GPL) |
 | Voice | Piper neural TTS, Hindi voices (fallbacks: macOS *Lekha*, espeak-ng) | open source, offline |
 | Music & SFX | Generated procedurally per video with numpy — zero copyright risk (`src/dva/audio`) | local |
@@ -78,8 +76,7 @@ see **[docs/CLOUD.md](docs/CLOUD.md)**.
 git clone <this repo> ~/Daily-Video-Automation && cd ~/Daily-Video-Automation
 ./scripts/setup_mac.sh                 # ffmpeg, venv, Piper Hindi voice, OFL fonts, .env, inbox/
 .venv/bin/python -m dva demo           # keyless demo prompt package -> output/<date>_run1/PROMPTS.md
-.venv/bin/python -m dva submit ~/Downloads/my_video.mp4 --caption "Title line
-my caption #facts"                     # publish your video with your caption
+.venv/bin/python -m dva submit ~/Downloads/my_video.mp4   # publish it (automatic caption + hashtags + tags)
 .venv/bin/python -m dva demo --mode full --fast            # (full mode) demo 3D render, needs Blender
 ```
 
@@ -101,7 +98,7 @@ Then add credentials (all free) — step by step in **[docs/SETUP.md](docs/SETUP
 | Command | What it does |
 |---|---|
 | `dva run [--force] [--json] [--mode prompt\|full]` | the daily pipeline (idempotent per day; `--json` for n8n) |
-| `dva submit <video> [--caption "…" \| --caption-file f.txt] [--video-id N]` | prompt mode: hand in your finished video + caption |
+| `dva submit <video> [--caption "…" \| --caption-file f.txt] [--video-id N]` | prompt mode: hand in your finished video (caption optional: automatic otherwise) |
 | `dva caption <id> "…"` / `dva caption <id> --suggested` | set the caption for a video that's waiting for one |
 | `dva watch` | prompt mode without Telegram: watch the inbox folder |
 | `dva demo [--mode prompt\|full] [--fast] [--fallback] [--tts espeak]` | built-in octopus demo without API keys |
@@ -133,7 +130,7 @@ src/dva/prompting/        prompt mode: AI-video prompt writer + PROMPTS.md
 src/dva/footage/          prompt mode: take your video + caption, QC, publish (optional extras); inbox watcher
 src/dva/discovery/        trend/RSS/Wikipedia sources, selector (dedup + LLM rank + performance weights)
 src/dva/research/         source fetching + fact verification
-src/dva/script/           Hinglish script writer, validator, fact audit
+src/dva/script/           script writer (easy English / Hinglish), captions + hashtags + tags, validator, fact audit
 src/dva/tts/              Piper / macOS say / espeak engines
 src/dva/render/           Blender runner, scene_builder.py (runs inside Blender), Pillow fallback, vocab
 src/dva/audio/            procedural music + SFX
@@ -153,7 +150,7 @@ tests/                    offline test-suite incl. a full end-to-end run with fa
 
 - **Telegram file limit (prompt mode):** bots can only *download* files up to 20 MB. A 60 s 1080p video
   is often bigger, so use the inbox folder for those (the bot tells you when a file is too big).
-- **Your file, your responsibility:** in prompt mode the system doesn't change your video or caption, so
+- **Your file, your responsibility:** in prompt mode the system doesn't change your video, so
   facts you add beyond the verified list aren't checked. The daily message lists exactly which facts are verified.
 - **Prompt quality** comes from Gemini; when it's unavailable you get simpler template prompts built from the
   scene plan (still complete and usable).

@@ -48,8 +48,16 @@ CLAIMS = {
 }
 
 
-def make_script(n_scenes: int = 6, bad_number: bool = False) -> dict:
-    lines = [
+def make_script(n_scenes: int = 6, bad_number: bool = False, lang: str = "english") -> dict:
+    english = [
+        ("Can a tiny animal survive in outer space?", ["C1"]),
+        ("Meet the tardigrade. It is only 0.5 mm long.", ["C2"]),
+        ("It has eight legs, and every leg has little claws!", ["C4"]),
+        ("It can survive cold as low as -272 degrees Celsius.", ["C3"]),
+        ("With no water, it dries up and waits. This is called cryptobiosis.", ["C5"]),
+        ("And it has even survived the vacuum of space. Follow for more facts!", ["C1"]),
+    ]
+    hinglish = [
         ("Kya ek animal space mein zinda reh sakta hai?", "क्या एक एनिमल स्पेस में ज़िंदा रह सकता है?", ["C1"]),
         ("Milo tardigrade se, sirf 0.5 mm ka chhota sa jeev.", "मिलो टार्डिग्रेड से, सिर्फ़ ज़ीरो पॉइंट फ़ाइव एमएम का छोटा सा जीव।", ["C2"]),
         ("Iske paas aath pair hote hain, aur har pair pe claws!", "इसके पास आठ पैर होते हैं, और हर पैर पे क्लॉज़!", ["C4"]),
@@ -59,15 +67,25 @@ def make_script(n_scenes: int = 6, bad_number: bool = False) -> dict:
     ]
     scenes = []
     for i in range(n_scenes):
-        disp, tts, cids = lines[i % len(lines)]
+        if lang == "hinglish":
+            disp, tts, cids = hinglish[i % 6]
+            disp += " Sach mein kamaal hai yaar."
+        else:
+            disp, cids = english[i % 6]
+            disp += " Isn't that amazing?"
+            tts = disp
         if bad_number and i == 1:
             disp = disp.replace("0.5", "5")
-        scenes.append({"narration_display": disp + " Sach mein kamaal hai yaar.", "narration_tts": tts,
+            tts = tts.replace("0.5", "5") if lang != "hinglish" else tts
+        scenes.append({"narration_display": disp, "narration_tts": tts,
                        "claim_ids": cids, "environment": "jungle", "props": ["creature", "planet"],
-                       "mascot_action": "explain", "camera": "push_in", "on_screen_text": "WATER BEAR", "sfx": "whoosh"})
+                       "mascot_action": "explain", "camera": "push_in", "on_screen_text": "WATER BEAR", "sfx": "whoosh",
+                       "visual_description": "A tiny cute tardigrade floating among stars."})
     return {"title": "Space survivor", "hook_style": "question", "scenes": scenes,
-            "youtube_title": "Ye jeev space mein zinda reh gaya!", "youtube_description": "Tardigrade facts.",
-            "instagram_caption": "Tardigrade 🐻 Kaunsa fact best laga?", "hashtags": ["#tardigrade", "science facts"]}
+            "youtube_title": "This tiny animal survived space!", "youtube_description": "Tardigrade facts.",
+            "instagram_caption": "Tardigrades are tiny but tough 🐻\nWhich fact surprised you?",
+            "hashtags": ["#tardigrade", "science facts"],
+            "youtube_tags": ["tardigrade facts", "water bear", "#animals in space"]}
 
 
 class FakeProvider(LLMProvider):
@@ -107,8 +125,12 @@ class FakeProvider(LLMProvider):
             import re
             ids = [int(x) for x in re.findall(r"^(\d+)\. \(", prompt, re.M)]
             return json.dumps({"scenes": [{"id": i, "shot": f"A tiny tardigrade floats in space, shot {i}.",
-                                           "camera": "slow dolly in", "transition_hint": "fade"} for i in ids],
-                               "thumbnail_prompt": "tardigrade in space", "music_mood": "curious upbeat"})
+                                           "camera": "slow dolly in", "transition_hint": "fade",
+                                           "music_cue": "gentle build"} for i in ids],
+                               "thumbnail_prompt": "tardigrade in space",
+                               "music": {"genre": "playful orchestral", "mood": "curious, bouncy", "tempo_bpm": 110,
+                                         "instruments": "pizzicato strings, marimba", "energy": "builds to reveal",
+                                         "search_keywords": "playful pizzicato", "avoid": "vocals"}})
         if "Write a ~" in prompt:
             self.calls.append("script")
             return json.dumps(self.script)

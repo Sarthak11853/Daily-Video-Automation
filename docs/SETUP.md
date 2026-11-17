@@ -93,28 +93,31 @@ A missed run is executed when the Mac wakes; runs are idempotent per day.
 
 ## 6. Your daily routine (prompt mode)
 
-1. ~9:00 AM the bot sends today's video #N: topic, **verified facts + sources**, **one message per scene
-   with tap-to-copy clip prompts**, a negative prompt, a single long prompt, a suggested Hinglish script,
-   a suggested caption and `PROMPTS.md` (everything in one file).
-2. Make the video in your tools: clips, editing, **your voiceover, your subtitles**. Export a vertical
+1. ~9:00 AM the bot sends today's video #N:
+   - topic and **verified facts + sources**
+   - an **easy-English voiceover script**
+   - a **background-music brief** (genre, mood, tempo, instruments, energy, search words)
+   - **one message per scene** with a music cue and tap-to-copy clip prompts
+   - a negative prompt and a single long prompt
+   - the **automatic caption, hashtags and YouTube tags**, and `PROMPTS.md` (everything in one file)
+2. Make the video in your tools: clips, editing, **your voiceover, subtitles and music**. Export a vertical
    9:16 MP4 (1080×1920, H.264/AAC is ideal; anything else is converted automatically).
-3. Deliver it with **your caption** (first line = YouTube title; the whole text = YouTube description +
-   Instagram caption; hashtags included):
-   - **Telegram:** send the video *as a file* (≤ 20 MB) and put the caption in the same message, or send the
-     caption as a text message right after (or even before) the video.
-   - **Inbox folder:** `N.mp4` + `N.txt` with the caption (any size).
-   - **Terminal:** `dva submit video.mp4 --caption-file caption.txt`.
+3. Deliver **just the video** (caption, hashtags and tags are automatic):
+   - **Telegram:** send it *as a file* (≤ 20 MB).
+   - **Inbox / Google Drive folder:** any size.
+   - **Terminal:** `dva submit video.mp4`.
+   Want your own caption instead? Type it with the video (first line = YouTube title).
 4. It's uploaded **exactly as you made it**. The bot replies with the YouTube and Instagram links, or says
    what's wrong (e.g. "no sound") so you can resend.
 
-No caption sent? The bot asks for one. Tap **💬 Use suggested caption** to post the system's version.
 Don't like the topic? Tap **⏭ Skip this topic** (never suggested again) and send `/new`.
 Want different prompts for the same facts? Tap **🔁 New script & prompts**.
 
 Options in `config/settings.yaml` → `prompt_mode` (all off by default):
 `confirm_before_publish` (preview + Publish button), `generate_voiceover` (TTS voiceover + .srt with the
 prompts), `post_process` (auto subtitles/voiceover), `add_branding` (watermark + progress bar),
-`allow_silent_video`, `caption_source` (`yours_only` / `yours_or_generated` / `generated`),
+`allow_silent_video`, `caption_source` (`yours_or_generated` = automatic unless you type one / `generated` /
+`yours_only`), `channel.language` (`english` or `hinglish`),
 `append_sources_to_caption`.
 
 **Inbox on your phone:** set `prompt_mode.inbox_dir` to an iCloud Drive folder, e.g.

@@ -74,7 +74,18 @@ def test_script_validation(llm, cfg):
     assert any("numbers" in p for p in validate_script(bad, sheet, cfg))
     few = normalize_script(make_script(n_scenes=3), cfg)
     assert any("scenes" in p for p in validate_script(few, sheet, cfg))
+    # easy English: no Hindi script, no very long sentences
     s = make_script()
+    s["scenes"][0]["narration_display"] = "क्या " + s["scenes"][0]["narration_display"]
+    assert any("English only" in p for p in validate_script(normalize_script(s, cfg), sheet, cfg))
+    s = make_script()
+    s["scenes"][2]["narration_display"] = ("It has eight legs and every one of those legs has little claws that help it "
+                                           "hold on to moss and leaves and tiny wet rocks all day long.")
+    assert any("too long" in p for p in validate_script(normalize_script(s, cfg), sheet, cfg))
+    # Hinglish mode still supported
+    cfg.data["channel"]["language"] = "hinglish"
+    assert validate_script(normalize_script(make_script(lang="hinglish"), cfg), sheet, cfg) == []
+    s = make_script(lang="hinglish")
     s["scenes"][0]["narration_tts"] = "roman only"
     assert any("Devanagari" in p for p in validate_script(normalize_script(s, cfg), sheet, cfg))
 
@@ -136,6 +147,9 @@ def test_metadata_limits(llm, cfg):
     assert len(m["instagram"]["caption"]) <= 2200
     assert sum(len(t) + 1 for t in m["youtube"]["tags"]) <= 500
     assert "esa.int" in m["instagram"]["caption"] and "Sources" in m["youtube"]["description"]
+    assert m["youtube"]["tags"][:2] == ["tardigrade facts", "water bear"]       # AI-chosen tags come first
+    assert "animals in space" in m["youtube"]["tags"] and m["youtube"]["language"] == "en"
+    assert m["caption_source"] == "automatic"
 
 
 def test_split_text():
