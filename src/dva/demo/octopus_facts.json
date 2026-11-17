@@ -1,0 +1,25 @@
+{
+  "topic": "Octopus",
+  "category": "animals",
+  "angle": "An octopus has three hearts, blue blood and arms packed with neurons.",
+  "demo": true,
+  "sources": [
+    {"id": "S1", "url": "https://en.wikipedia.org/wiki/Octopus", "title": "Octopus — Wikipedia", "domain": "wikipedia.org", "tier": 2, "text": ""},
+    {"id": "S2", "url": "https://en.wikipedia.org/wiki/Hemocyanin", "title": "Hemocyanin — Wikipedia", "domain": "wikipedia.org", "tier": 2, "text": ""}
+  ],
+  "claims": [
+    {"id": "C1", "text": "Octopuses have three hearts.", "is_core": true, "verified": true, "independent_sources": 1,
+     "verification_notes": "DEMO: hand-curated from the Wikipedia 'Octopus' article (circulatory system section). Re-check before publishing.",
+     "evidence": [{"source_id": "S1", "quote": "Octopuses have three hearts (demo paraphrase, see Circulatory system section)"}]},
+    {"id": "C2", "text": "Two of the hearts pump blood through the two gills, and the third (systemic) heart pumps it around the rest of the body.", "is_core": false, "verified": true, "independent_sources": 1,
+     "verification_notes": "DEMO: hand-curated.", "evidence": [{"source_id": "S1", "quote": "two branchial hearts pump blood through the gills; the systemic heart pumps it through the body (demo paraphrase)"}]},
+    {"id": "C3", "text": "The systemic heart stops beating while the octopus swims, so it tires quickly and prefers to crawl.", "is_core": false, "verified": true, "independent_sources": 1,
+     "verification_notes": "DEMO: hand-curated.", "evidence": [{"source_id": "S1", "quote": "the systemic heart is inactive when the animal is swimming; it tires quickly and prefers to crawl (demo paraphrase)"}]},
+    {"id": "C4", "text": "Octopus blood is blue because it carries oxygen with the copper-rich protein haemocyanin.", "is_core": false, "verified": true, "independent_sources": 1,
+     "verification_notes": "DEMO: hand-curated.", "evidence": [{"source_id": "S2", "quote": "hemocyanin is a copper-containing oxygen-carrying protein that turns blue when oxygenated (demo paraphrase)"}]},
+    {"id": "C5", "text": "An octopus has about 500 million neurons, and roughly two-thirds of them are in its arms.", "is_core": false, "verified": true, "independent_sources": 1,
+     "verification_notes": "DEMO: hand-curated.", "evidence": [{"source_id": "S1", "quote": "around 500 million neurons, about two-thirds of them in the nerve cords of the arms (demo paraphrase)"}]},
+    {"id": "C6", "text": "Octopus suckers have chemoreceptors, so an octopus can taste what it touches.", "is_core": false, "verified": true, "independent_sources": 1,
+     "verification_notes": "DEMO: hand-curated.", "evidence": [{"source_id": "S1", "quote": "the suckers are equipped with chemoreceptors so the octopus can taste what it touches (demo paraphrase)"}]}
+  ]
+}

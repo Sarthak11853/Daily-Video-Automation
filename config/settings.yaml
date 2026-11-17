@@ -1,0 +1,183 @@
+# ---------------------------------------------------------------------------
+# Daily AI Animated Facts — main configuration
+# Secrets (API keys, tokens) NEVER go in this file. Put them in `.env`
+# (see `.env.example`). Every value here can be overridden with an env var
+# named DVA__SECTION__KEY, e.g. DVA__VIDEO__FPS=24.
+# ---------------------------------------------------------------------------
+
+channel:
+  name: "Rochak Facts"            # shown in the outro / watermark
+  handle: "@rochakfacts"
+  mascot_name: "Gyaanu"           # the recurring 3D robot host (channel identity)
+  timezone: "Asia/Kolkata"
+  daily_time: "09:00"
+  default_hashtags: ["#facts", "#hindifacts", "#rochakfacts", "#didyouknow", "#science"]
+
+paths:
+  data_dir: "data"                # SQLite DB, logs, caches
+  output_dir: "output"            # one folder per day
+  assets_dir: "assets"
+  secrets_dir: "secrets"          # OAuth tokens (chmod 600, git-ignored)
+
+video:
+  width: 1080
+  height: 1920
+  fps: 30                         # final encode fps
+  target_duration: 60
+  min_duration: 45
+  max_duration: 75
+  min_scenes: 6
+  max_scenes: 10
+  transition_seconds: 0.35
+  scene_padding_seconds: 0.35     # breathing room after each narration chunk
+  crf: 20
+  maxrate: "5M"                   # keeps a 60 s video < 50 MB (Telegram bot limit)
+  audio_bitrate: "192k"
+  max_file_mb: 49
+  progress_bar: true
+  watermark: true
+
+topics:
+  categories: [science, technology, space, history, psychology, geography, animals, mysteries, discoveries]
+  avoid_days: 365                 # never repeat a topic within this window
+  similarity_threshold: 0.6       # title/keyword similarity treated as duplicate
+  max_candidates_for_llm: 25
+  exploration_rate: 0.2           # share of picks that ignore performance weights
+  blocked_keywords: [death toll, killed, murder, rape, suicide, election, bjp, congress, terror,
+                     war, riot, celebrity, actress, actor, cricket score, ipl, bollywood, gossip]
+  google_trends:
+    enabled: true
+    url: "https://trends.google.com/trending/rss?geo=IN"
+  wikipedia_featured:
+    enabled: true
+  evergreen_seed_enabled: true    # curated Wikipedia articles used when trends are weak
+  rss_feeds:
+    - {name: NASA, url: "https://www.nasa.gov/news-release/feed/", category: space}
+    - {name: ScienceDaily, url: "https://www.sciencedaily.com/rss/top/science.xml", category: science}
+    - {name: Phys.org, url: "https://phys.org/rss-feed/", category: science}
+    - {name: BBC Science, url: "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml", category: science}
+    - {name: Smithsonian, url: "https://www.smithsonianmag.com/rss/latest_articles/", category: history}
+    - {name: ESA, url: "https://www.esa.int/rssfeed/Our_Activities/Space_Science", category: space}
+    - {name: LiveScience, url: "https://www.livescience.com/feeds/all", category: discoveries}
+    - {name: The Conversation Science, url: "https://theconversation.com/global/topics/science-1095/articles.atom", category: science}
+
+research:
+  min_verified_claims: 5
+  min_independent_sources: 2      # for the core claim
+  allow_single_tier1_source: true # NASA/ESA/Nature/etc. alone may verify a claim
+  max_source_chars: 12000
+  request_timeout: 20
+  user_agent: "DailyFactsBot/0.1 (personal non-commercial; contact via repo)"
+  trusted_domains:
+    tier1: [nasa.gov, esa.int, nature.com, science.org, nih.gov, ncbi.nlm.nih.gov, who.int, noaa.gov,
+            usgs.gov, si.edu, smithsonianmag.com, nationalgeographic.com, britannica.com, isro.gov.in,
+            cern.ch, mit.edu, harvard.edu, ox.ac.uk, cam.ac.uk, nhm.ac.uk, royalsociety.org]
+    tier2: [wikipedia.org, sciencedaily.com, phys.org, bbc.co.uk, bbc.com, livescience.com,
+            newscientist.com, theconversation.com, scientificamerican.com, space.com, reuters.com,
+            apnews.com, thehindu.com, indianexpress.com, sciencenews.org, quantamagazine.org]
+
+llm:
+  provider_order: [gemini, ollama]   # first available provider wins; others are fallbacks
+  temperature: 0.8
+  gemini:
+    api_key_env: GEMINI_API_KEY
+    model: "gemini-flash-latest"
+    judge_model: "gemini-flash-lite-latest"
+    daily_request_limit: 40          # self-imposed ceiling, well under the free tier
+    min_seconds_between_calls: 7     # stay under free-tier RPM
+  ollama:
+    base_url: "http://localhost:11434"
+    model: "qwen2.5:7b"
+    judge_model: "qwen2.5:7b"
+    daily_request_limit: 500
+
+script:
+  words_per_second: 2.55          # Hinglish narration pace used for length planning
+  min_words: 120
+  max_words: 175
+  max_attempts: 3
+
+tts:
+  engine_order: [piper, macos_say, espeak]
+  piper:
+    voice: "hi_IN-pratham-medium"   # also try hi_IN-priyamvada-medium (female)
+    length_scale: 0.92              # < 1.0 = slightly faster, more energetic
+    noise_scale: 0.6
+    sentence_silence: 0.15
+  macos_say:
+    voice: "Lekha"
+    rate: 185
+  espeak:
+    voice: "hi"
+    speed: 160
+
+render:
+  engine_order: [blender, fallback]  # fallback = fast 2.5D Pillow renderer
+  blender:
+    executable: "auto"     # auto-detect /Applications/Blender.app, `blender` on PATH, or `bpy` module
+    render_engine: "auto"  # auto = EEVEE, retry with CYCLES if EEVEE is unavailable (headless/no GPU)
+    render_fps: 24         # frames rendered by Blender; final encode resamples to video.fps
+    eevee_samples: 32
+    cycles_samples: 24
+    resolution_percentage: 100
+    parallel_scenes: 2
+    timeout_per_scene: 2400
+    font_path: "assets/fonts/Poppins-ExtraBold.ttf"   # optional; Blender's built-in font otherwise
+  style:
+    mascot_color: [0.10, 0.78, 0.82]
+    accent_color: [1.00, 0.78, 0.10]
+    text_color: [1.00, 0.93, 0.25]
+
+audio:
+  music: "procedural"        # "procedural" (always license-free) or "library" (assets/music/*.mp3|wav, CC0 only)
+  music_volume_db: -20
+  duck_amount: 0.25
+  sfx: true
+  target_lufs: -14
+
+subtitles:
+  font: "Poppins ExtraBold"
+  fonts_dir: "assets/fonts"
+  font_size: 92
+  words_per_chunk: 3
+  highlight_color: "&H0021D4FF"     # ASS BGR — warm yellow
+  primary_color: "&H00FFFFFF"
+  outline_color: "&H00201010"
+  margin_v: 430                     # bottom of captions at ~78% height: above the Reels/Shorts UI
+
+qc:
+  max_black_seconds: 0.6
+  max_silence_seconds: 2.0
+  max_sync_drift_seconds: 0.5
+  require_all_claims_verified: true
+
+approval:
+  telegram:
+    bot_token_env: TELEGRAM_BOT_TOKEN
+    chat_id_env: TELEGRAM_CHAT_ID
+    reminder_hours: 4
+    poll_timeout: 50
+
+publish:
+  enabled_platforms: [youtube, instagram]
+  youtube:
+    client_secret_file: "secrets/youtube_client_secret.json"
+    token_file: "secrets/youtube_token.json"
+    privacy_status: "public"       # unverified API projects are forced to private by YouTube
+    category_id: "27"              # Education
+    made_for_kids: false
+    contains_synthetic_media: false  # animation is exempt; set true if you add realistic AI visuals
+    daily_upload_limit: 3
+  instagram:
+    api: "instagram_login"         # "instagram_login" (graph.instagram.com) or "facebook_login" (graph.facebook.com)
+    api_version: "v23.0"
+    token_env: INSTAGRAM_ACCESS_TOKEN
+    user_id_env: INSTAGRAM_USER_ID
+    share_to_feed: true
+    status_poll_seconds: 10
+    status_poll_max: 60
+    daily_upload_limit: 3
+
+analytics:
+  collect_after_hours: [24, 72, 168]
+  youtube_analytics_api: true      # needs yt-analytics.readonly scope (shares, retention)

@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+secrets/
+data/
+output/
+assets/voices/*.onnx
+assets/voices/*.onnx.json
+assets/fonts/*.ttf
+*.log
+.DS_Store
+n8n/*.local.json
