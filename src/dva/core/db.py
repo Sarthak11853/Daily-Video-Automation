@@ -117,7 +117,8 @@ class Database:
     def _migrate(self) -> None:
         """Add columns introduced after the first release (idempotent)."""
         cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(videos)")}
-        for name, decl in (("prompts_json", "TEXT"), ("footage_path", "TEXT"), ("mode", "TEXT DEFAULT 'full'")):
+        for name, decl in (("prompts_json", "TEXT"), ("footage_path", "TEXT"), ("mode", "TEXT DEFAULT 'full'"),
+                           ("user_caption", "TEXT")):
             if name not in cols:
                 self.conn.execute(f"ALTER TABLE videos ADD COLUMN {name} {decl}")
         self.conn.commit()

@@ -152,17 +152,19 @@ class VideoPromptWriter:
         return " ".join(x for x in lines if x)
 
 
-def prompts_markdown(pkg: dict, script: dict, sheet: FactSheet, meta: dict, video_id: int) -> str:
+def prompts_markdown(pkg: dict, script: dict, sheet: FactSheet, meta: dict, video_id: int,
+                     has_voice: bool = False) -> str:
     out = [f"# Video #{video_id}: {script.get('title') or sheet.topic}", "",
            f"**Topic:** {sheet.topic} · **Category:** {sheet.category} · **Length:** ~{pkg['total_seconds']:.0f}s "
            f"· **Scenes:** {len(pkg['scenes'])}", "", f"**Angle:** {sheet.angle}", "",
            "## How to deliver", "",
            "1. Generate each clip below (or use the single prompt if your tool makes long videos).",
-           "2. Put the clips in order (any editor, or let the system join them: drop all clips in one folder "
-           "inside the inbox).",
-           "3. Leave the video **silent** and the system adds the Hinglish voiceover, music and subtitles, "
-           "or put `voiceover.wav` under it starting at 0:00.",
-           "4. Send the final video to the Telegram bot (as a file, up to 20 MB) or drop it in the inbox folder.",
+           "2. Edit the clips together and add your voiceover and subtitles (the suggested script and the "
+           "verified facts are at the end of this file)." + (" A ready TTS voiceover is in `voiceover.wav`."
+                                                             if has_voice else ""),
+           "3. Export a vertical 9:16 MP4 (H.264 + AAC, 1080x1920 ideally).",
+           "4. Send it to the Telegram bot as a file (up to 20 MB) **with your caption**, or drop it in the "
+           "inbox folder with the caption in a .txt file of the same name. It is published exactly as you made it.",
            "", "## Style (already included in every prompt)", "", pkg["style_bible"], "",
            f"**Character:** {pkg['character'] or '—'}", "", f"**Negative prompt:** {pkg['negative_prompt']}", "",
            f"**Music mood:** {pkg.get('music_mood', '')}", "", "## Clips", ""]
@@ -173,10 +175,12 @@ def prompts_markdown(pkg: dict, script: dict, sheet: FactSheet, meta: dict, vide
             out += [f"**Clip {c['clip']} ({c['seconds']:.1f}s)**", "```", c["prompt"], "```", ""]
     out += ["## Single prompt (long-video tools)", "```", pkg["single_prompt"], "```", "",
             "## Thumbnail prompt", "```", pkg["thumbnail_prompt"], "```", "",
-            "## Full voiceover (Hinglish)", ""] + [f"{s['id']}. {s['voiceover']}" for s in pkg["scenes"]]
+            "## Suggested Hinglish script (optional)", ""] + [f"{s['id']}. ({s['seconds']:.0f}s) {s['voiceover']}"
+                                                              for s in pkg["scenes"]]
     out += ["", "## Verified facts", ""] + [f"- {c.text}" for c in sheet.verified_claims]
     out += ["", "## Sources", ""] + [f"- {s.title}: {s.url}" for s in sheet.sources]
-    out += ["", "## Captions that will be used", "", f"**YouTube title:** {meta['youtube']['title']}", "",
+    out += ["", "## Suggested captions (used only if you choose them)", "",
+            f"**YouTube title:** {meta['youtube']['title']}", "",
             "```", meta["youtube"]["description"], "```", "", "**Instagram:**", "```", meta["instagram"]["caption"], "```"]
     return "\n".join(out) + "\n"
 
@@ -184,5 +188,6 @@ def prompts_markdown(pkg: dict, script: dict, sheet: FactSheet, meta: dict, vide
 def save_package(out_dir, pkg: dict, script: dict, sheet: FactSheet, meta: dict, video_id: int):
     (out_dir / "prompts.json").write_text(json.dumps(pkg, ensure_ascii=False, indent=2), encoding="utf-8")
     md = out_dir / "PROMPTS.md"
-    md.write_text(prompts_markdown(pkg, script, sheet, meta, video_id), encoding="utf-8")
+    md.write_text(prompts_markdown(pkg, script, sheet, meta, video_id, (out_dir / "voiceover.wav").exists()),
+                  encoding="utf-8")
     return md

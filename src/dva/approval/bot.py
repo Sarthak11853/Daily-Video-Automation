@@ -16,12 +16,13 @@ from ..core.db import utcnow
 
 log = logging.getLogger(__name__)
 
-HELP = ("Send me your finished video (as a file) and I'll finish + publish it.\n\n"
+HELP = ("Send me your finished video (as a file) with your caption and I'll publish it.\n"
+        "A text message = caption for the video waiting for one.\n\n"
         "/status – latest runs & pending videos\n/new – make today's topic/prompts now\n"
         "/pending – resend what's waiting for you\n/prompts <id> – resend prompts for a video\n"
         "/skip <id> – drop a pending topic\n/metrics – performance summary\n/help – this message")
-ALLOWED = {"approve": ("awaiting_approval",), "reject": ("awaiting_approval", "awaiting_footage"),
-           "regen": ("awaiting_approval", "awaiting_footage")}
+ALLOWED = {"approve": ("awaiting_approval",), "reject": ("awaiting_approval", "awaiting_footage", "awaiting_caption"),
+           "regen": ("awaiting_approval", "awaiting_footage"), "autocap": ("awaiting_caption",)}
 TELEGRAM_DOWNLOAD_LIMIT = 20 * 1024 * 1024
 
 
@@ -65,10 +66,15 @@ class ApprovalBot:
         if not v or v["status"] not in ALLOWED.get(action, ()):
             self.tg.answer_callback(cq["id"], f"Already handled ({v['status'] if v else 'missing'})")
             return
-        labels = {"approve": "Publishing…", "reject": "Dropped", "regen": "Working on a new version…"}
+        labels = {"approve": "Publishing…", "reject": "Dropped", "regen": "Working on a new version…",
+                  "autocap": "Publishing with the suggested caption…"}
         self.tg.answer_callback(cq["id"], labels.get(action, "?"))
         self.tg.clear_buttons(cq["message"]["message_id"])
-        self._job(self.p.decide, video_id, action)
+        if action == "autocap":
+            from ..footage.processor import FootageProcessor
+            self._job(FootageProcessor(self.p).use_suggested, video_id)
+        else:
+            self._job(self.p.decide, video_id, action)
 
     # ----------------------------------------------------- footage intake
     def _target_for(self, msg: dict):
@@ -104,11 +110,31 @@ class ApprovalBot:
         run = self.db.one("SELECT output_dir FROM runs WHERE id=?", (target["run_id"],))
         dest = Path(run["output_dir"]) / "footage_in" / f"{msg['message_id']}_{Path(name).stem}{Path(name).suffix or '.mp4'}"
 
+        caption = msg.get("caption")
+
         def work():
             from ..footage.processor import FootageProcessor
             self.tg.download(media["file_id"], dest)
-            return FootageProcessor(self.p).process(target["id"], [dest])
+            return FootageProcessor(self.p).process(target["id"], [dest], caption=caption)
         self._job(work)
+
+    def handle_caption_text(self, text: str) -> None:
+        """A plain text message is a caption: for the video waiting for one, else for the next video."""
+        from ..footage.processor import FootageProcessor
+        proc = FootageProcessor(self.p)
+        waiting = self.db.one("SELECT id FROM videos WHERE status='awaiting_caption' ORDER BY id DESC LIMIT 1")
+        if waiting:
+            cap = proc.clean_caption(text, waiting["id"])
+            self.tg.send_message(f"✍️ Caption received for #{waiting['id']}, publishing…")
+            self._job(proc.apply_caption, waiting["id"], cap)
+            return
+        target = proc.resolve(text)
+        if target:
+            cap = proc.clean_caption(text, target["id"])
+            self.db.update_video(target["id"], user_caption=cap)
+            self.tg.send_message(f"✍️ Saved as the caption for #{target['id']}. Now send the video.")
+            return
+        self.tg.send_message(HELP)
 
     def poll_inbox(self) -> None:
         if self.busy:
@@ -130,13 +156,16 @@ class ApprovalBot:
         if msg.get("video") or msg.get("document") or msg.get("animation"):
             self.handle_footage(msg)
             return
+        if text and not text.startswith("/"):
+            self.handle_caption_text(text)
+            return
         parts = text.split()
         cmd = parts[0].split("@")[0].lower() if parts else ""
         arg = int(parts[1].lstrip("#")) if len(parts) > 1 and re.fullmatch(r"#?\d+", parts[1]) else None
         if cmd == "/status":
             runs = self.db.query("SELECT id, run_date, kind, status, stage FROM runs ORDER BY id DESC LIMIT 5")
-            pend = self.db.query("SELECT id, title, status FROM videos WHERE status IN "
-                                 "('awaiting_approval','awaiting_footage','processing_footage') ORDER BY id DESC")
+            pend = self.db.query("SELECT id, title, status FROM videos WHERE status IN ('awaiting_approval',"
+                                 "'awaiting_footage','processing_footage','awaiting_caption') ORDER BY id DESC")
             out = ["Recent runs:"] + [f"#{r['id']} {r['run_date']} {r['kind']} {r['status']} ({r['stage']})" for r in runs]
             out += ["", "Waiting on you:"] + ([f"#{v['id']} {v['title']} — {v['status']}" for v in pend] or ["nothing"])
             out += ["", "Worker: busy" if self.busy else "Worker: idle"]
@@ -152,12 +181,17 @@ class ApprovalBot:
             from ..analytics.collector import report
             self.tg.send_message(report(self.db))
         elif cmd == "/pending":
-            rows = self.db.query("SELECT id, status FROM videos WHERE status IN ('awaiting_approval','awaiting_footage')")
+            rows = self.db.query("SELECT id, status FROM videos WHERE status IN "
+                                 "('awaiting_approval','awaiting_footage','awaiting_caption')")
             if not rows:
                 self.tg.send_message("Nothing is waiting for you. 🎉")
             for v in rows:
                 if v["status"] == "awaiting_footage":
                     self.p.send_prompt_package(v["id"])
+                elif v["status"] == "awaiting_caption":
+                    from .telegram import Telegram
+                    self.tg.send_message(f"✍️ #{v['id']} is waiting for your caption. Send it as a text message.",
+                                         reply_markup=Telegram.caption_keyboard(v["id"]))
                 else:
                     self.p.send_for_approval(v["id"])
         elif cmd == "/prompts" and arg:
@@ -174,10 +208,12 @@ class ApprovalBot:
     def remind(self) -> None:
         hours = float(self.p.cfg.get("approval.telegram.reminder_hours", 4))
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat(timespec="seconds")
-        rows = self.db.query("SELECT id, title, status FROM videos WHERE status IN ('awaiting_approval','awaiting_footage') "
+        rows = self.db.query("SELECT id, title, status FROM videos WHERE status IN "
+                             "('awaiting_approval','awaiting_footage','awaiting_caption') "
                              "AND created_at < ? AND (reminded_at IS NULL OR reminded_at < ?)", (cutoff, cutoff))
         for r in rows:
-            what = "is waiting for your video" if r["status"] == "awaiting_footage" else "is waiting for your approval"
+            what = {"awaiting_footage": "is waiting for your video", "awaiting_caption": "is waiting for your caption"
+                    }.get(r["status"], "is waiting for your approval")
             self.tg.send_message(f"⏰ Reminder: #{r['id']} “{r['title']}” {what}. Send /pending to see it again.")
             self.db.update_video(r["id"], reminded_at=utcnow())
 

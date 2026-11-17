@@ -3,7 +3,10 @@ inbox and it's picked up automatically. Works with any synced folder (iCloud
 Drive, Google Drive desktop, AirDrop to Downloads → move, etc.).
 
 Matching: a number in the file/folder name that equals a pending video id
-(e.g. `12.mp4`, `video-12/`) wins; otherwise the newest pending video is used."""
+(e.g. `12.mp4`, `video-12/`) wins; otherwise the newest pending video is used.
+
+Caption: put it in a .txt next to the video with the same name (`12.mp4` +
+`12.txt`), or any .txt inside a clips folder (e.g. `caption.txt`)."""
 from __future__ import annotations
 
 import logging
@@ -47,6 +50,14 @@ def ready_items(inbox: Path, settle_file: float = 20, settle_dir: float = 60) ->
     return out
 
 
+def _caption_for(item: Path) -> tuple[str | None, Path | None]:
+    if item.is_file():
+        side = item.with_suffix(".txt")
+        return (side.read_text(encoding="utf-8").strip() or None, side) if side.exists() else (None, None)
+    txts = sorted(item.rglob("*.txt"))
+    return (txts[0].read_text(encoding="utf-8").strip() or None, None) if txts else (None, None)
+
+
 def _move(item: Path, folder: Path) -> Path:
     folder.mkdir(parents=True, exist_ok=True)
     dest = folder / f"{datetime.now():%Y%m%d-%H%M%S}_{item.name}"
@@ -65,10 +76,15 @@ def scan_inbox(pipeline, settle_file: float = 20, settle_dir: float = 60) -> lis
             dest = _move(item, inbox / "unmatched")
             messages.append(f"📥 Got {item.name}, but no video is waiting for footage. Moved to {dest}.")
             continue
+        caption, sidecar = _caption_for(item)
         working = _move(item, inbox / ".working")
         log.info("inbox: %s -> video #%s", item.name, target["id"])
-        msg = proc.process(target["id"], _files(working))
+        msg = proc.process(target["id"], [f for f in _files(working) if f.suffix.lower() in VIDEO_EXT],
+                           caption=caption)
         ok = pipeline.db.get_video(target["id"])["status"] != "awaiting_footage"
-        _move(working, inbox / ("processed" if ok else "failed"))
+        dest_dir = inbox / ("processed" if ok else "failed")
+        _move(working, dest_dir)
+        if sidecar and sidecar.exists():
+            _move(sidecar, dest_dir)
         messages.append(f"📥 {item.name} → #{target['id']}\n{msg}")
     return messages

@@ -4,21 +4,26 @@ Every morning at **9:00 AM IST** this system finds a trending or evergreen *inte
 verifies it against trusted sources and writes a **Hinglish** script. What happens next depends on
 `workflow.mode` in `config/settings.yaml`:
 
-### Prompt mode (default): you make the video, the system does everything else
+### Prompt mode (default): you make the video, voiceover and captions; the system does the rest
 
-1. **9:00 AM, on Telegram:** today's topic, verified facts and sources, plus **copy-paste prompts for
-   your AI video tool**. There is one prompt per clip, each sized to the real voiceover timing (≤ 8 s per clip by
-   default), and each prompt repeats the channel style and the recurring host character so separately
-   generated clips still match. You also get a single long prompt, a negative prompt, a ready
-   **Hinglish voiceover** (`voiceover_with_music.wav`), subtitles (`.srt`) and the captions that will be posted.
-2. **You generate the video** in any tool and send it back, either **to the Telegram bot** (as a file, ≤ 20 MB)
-   or by dropping it (or a folder of clips) into the **inbox folder** (any size; can be an iCloud Drive folder
-   so you can do it from your phone).
-3. **The system finishes and publishes it:** joins clips, converts any shape to 1080×1920 (blurred fill
-   for 16:9), and, **if your video is silent, adds the voiceover, music and word-by-word subtitles**
-   (fitting the video to the voiceover length). It then runs QC and uploads to **YouTube Shorts** and
-   **Instagram Reels** with platform-specific titles, descriptions, captions and hashtags, and replies
-   with the links. Buttons: *🔁 New script & prompts* and *⏭ Skip this topic*.
+1. **9:00 AM, on Telegram:** today's trending topic, the **verified facts and sources** (safe to say in
+   your voiceover), and **copy-paste prompts for your AI video tool**: one prompt per clip (≤ 8 s each by
+   default), each repeating the channel style and the recurring host character so separately generated
+   clips still match. You also get a single long prompt, a negative prompt, a **suggested Hinglish script**
+   and a **suggested caption**. Both are optional; ignore them if you write your own.
+2. **You make everything:** video, voiceover, subtitles, caption.
+3. **Send it back:** the video **as a file** to the Telegram bot (≤ 20 MB) **with your caption** in the same
+   message (or as a text right after), or drop `N.mp4` + `N.txt` (caption) into the **inbox folder**
+   (any size; can be an iCloud Drive folder). Forgot the caption? The bot asks, with a one-tap
+   *Use suggested caption* option.
+4. **The system publishes it exactly as you made it** to **YouTube Shorts** and **Instagram Reels**. Your
+   caption is posted as written: first line = YouTube title, full text = YouTube description and
+   Instagram caption, and your hashtags also become YouTube tags. The file is only re-encoded if a platform
+   would reject it (e.g. not 9:16, wrong codec or frame rate); otherwise the original streams are kept.
+   A silent video is refused by default (missing voiceover?). It runs QC, uploads, and replies with the links.
+
+Buttons on the daily message: *🔁 New script & prompts* and *⏭ Skip this topic*. Optional extras (TTS voiceover,
+auto subtitles, watermark, a preview before publishing) are in `prompt_mode` in `config/settings.yaml`, all off.
 
 ### Full mode: fully automatic 3D rendering
 
@@ -71,7 +76,8 @@ Both modes run **locally on your Mac** with free and open-source tools. No paid 
 git clone <this repo> ~/Daily-Video-Automation && cd ~/Daily-Video-Automation
 ./scripts/setup_mac.sh                 # ffmpeg, venv, Piper Hindi voice, OFL fonts, .env, inbox/
 .venv/bin/python -m dva demo           # keyless demo prompt package -> output/<date>_run1/PROMPTS.md
-.venv/bin/python -m dva submit ~/Downloads/my_video.mp4   # finish + publish your video for it
+.venv/bin/python -m dva submit ~/Downloads/my_video.mp4 --caption "Title line
+my caption #facts"                     # publish your video with your caption
 .venv/bin/python -m dva demo --mode full --fast            # (full mode) demo 3D render, needs Blender
 ```
 
@@ -93,7 +99,8 @@ Then add credentials (all free) — step by step in **[docs/SETUP.md](docs/SETUP
 | Command | What it does |
 |---|---|
 | `dva run [--force] [--json] [--mode prompt\|full]` | the daily pipeline (idempotent per day; `--json` for n8n) |
-| `dva submit <video or clips…> [--video-id N]` | prompt mode: hand in your video (clips are joined in name order) |
+| `dva submit <video> [--caption "…" \| --caption-file f.txt] [--video-id N]` | prompt mode: hand in your finished video + caption |
+| `dva caption <id> "…"` / `dva caption <id> --suggested` | set the caption for a video that's waiting for one |
 | `dva watch` | prompt mode without Telegram: watch the inbox folder |
 | `dva demo [--mode prompt\|full] [--fast] [--fallback] [--tts espeak]` | built-in octopus demo without API keys |
 | `dva bot` | Telegram listener: receives your videos, watches the inbox, buttons, `/status`, `/new`, `/pending`, `/prompts <id>`, `/skip <id>`, `/metrics` |
@@ -120,7 +127,7 @@ Then add credentials (all free) — step by step in **[docs/SETUP.md](docs/SETUP
 config/settings.yaml      all tunables (channel, schedule, quotas, style, QC thresholds)
 src/dva/pipeline.py       orchestration (both modes), failure → production package
 src/dva/prompting/        prompt mode: AI-video prompt writer + PROMPTS.md
-src/dva/footage/          prompt mode: conform/join your footage, add voice+subs, QC; inbox watcher
+src/dva/footage/          prompt mode: take your video + caption, QC, publish (optional extras); inbox watcher
 src/dva/discovery/        trend/RSS/Wikipedia sources, selector (dedup + LLM rank + performance weights)
 src/dva/research/         source fetching + fact verification
 src/dva/script/           Hinglish script writer, validator, fact audit
@@ -141,9 +148,8 @@ tests/                    offline test-suite incl. a full end-to-end run with fa
 
 - **Telegram file limit (prompt mode):** bots can only *download* files up to 20 MB. A 60 s 1080p video
   is often bigger, so use the inbox folder for those (the bot tells you when a file is too big).
-- **Your footage's audio:** in `post_process: auto`, a video *with* sound is uploaded as-is (no subtitles
-  are added, because they could not be timed to your audio). If you placed `voiceover_with_music.wav` under
-  your video from 0:00, set `post_process: subtitles_only` to get burned-in subtitles too.
+- **Your file, your responsibility:** in prompt mode the system doesn't change your video or caption, so
+  facts you add beyond the verified list aren't checked. The daily message lists exactly which facts are verified.
 - **Prompt quality** comes from Gemini; when it's unavailable you get simpler template prompts built from the
   scene plan (still complete and usable).
 

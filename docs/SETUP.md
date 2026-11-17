@@ -1,6 +1,7 @@
 # Setup guide (all free)
 
-Run `./scripts/setup_mac.sh` first (Blender is only installed when `workflow.mode: full`), then fill in `.env` (it is created with `chmod 600`).
+Run `./scripts/setup_mac.sh` first (Blender and the Piper voice are only installed when the system has to
+render or voice videos itself), then fill in `.env` (it is created with `chmod 600`).
 After each step, `.venv/bin/python -m dva doctor` shows what is ready.
 
 > Prefer the macOS Keychain? Store a secret with
@@ -92,23 +93,29 @@ A missed run is executed when the Mac wakes; runs are idempotent per day.
 
 ## 6. Your daily routine (prompt mode)
 
-1. ~9:00 AM the bot sends today's video #N: topic, verified facts, **one message per scene with
-   tap-to-copy clip prompts**, a negative prompt, a single long prompt, `PROMPTS.md`,
-   `voiceover_with_music.wav`, `voiceover.wav` and `subtitles.srt`.
-2. Generate the clips in your AI video tool. Keep each at the duration shown.
-3. Deliver **one** of these ways:
-   - Join the clips yourself and **reply to the bot's last message** with the video *as a file* (≤ 20 MB).
-   - Drop the finished video into the inbox folder (name it `N.mp4`, or anything; the newest pending video is used).
-   - Drop a **folder of clips** (named `01.mp4`, `02.mp4`, …) into the inbox, and they're joined in name order.
-   - From the terminal: `dva submit clip1.mp4 clip2.mp4 --video-id N`.
-4. Within a few minutes the bot replies with the YouTube and Instagram links (or with what to fix: the
-   video goes back to "waiting" so you can simply resend).
+1. ~9:00 AM the bot sends today's video #N: topic, **verified facts + sources**, **one message per scene
+   with tap-to-copy clip prompts**, a negative prompt, a single long prompt, a suggested Hinglish script,
+   a suggested caption and `PROMPTS.md` (everything in one file).
+2. Make the video in your tools: clips, editing, **your voiceover, your subtitles**. Export a vertical
+   9:16 MP4 (1080×1920, H.264/AAC is ideal; anything else is converted automatically).
+3. Deliver it with **your caption** (first line = YouTube title; the whole text = YouTube description +
+   Instagram caption; hashtags included):
+   - **Telegram:** send the video *as a file* (≤ 20 MB) and put the caption in the same message, or send the
+     caption as a text message right after (or even before) the video.
+   - **Inbox folder:** `N.mp4` + `N.txt` with the caption (any size).
+   - **Terminal:** `dva submit video.mp4 --caption-file caption.txt`.
+4. It's uploaded **exactly as you made it**. The bot replies with the YouTube and Instagram links, or says
+   what's wrong (e.g. "no sound") so you can resend.
 
-Don't like the topic? Tap **⏭ Skip this topic** (it's never suggested again) and send `/new`.
+No caption sent? The bot asks for one. Tap **💬 Use suggested caption** to post the system's version.
+Don't like the topic? Tap **⏭ Skip this topic** (never suggested again) and send `/new`.
 Want different prompts for the same facts? Tap **🔁 New script & prompts**.
 
-To publish only after a final look, set `prompt_mode.confirm_before_publish: true` (you get a preview
-with *Publish / Reject* buttons).
+Options in `config/settings.yaml` → `prompt_mode` (all off by default):
+`confirm_before_publish` (preview + Publish button), `generate_voiceover` (TTS voiceover + .srt with the
+prompts), `post_process` (auto subtitles/voiceover), `add_branding` (watermark + progress bar),
+`allow_silent_video`, `caption_source` (`yours_only` / `yours_or_generated` / `generated`),
+`append_sources_to_caption`.
 
 **Inbox on your phone:** set `prompt_mode.inbox_dir` to an iCloud Drive folder, e.g.
 `~/Library/Mobile Documents/com~apple~CloudDocs/DVA Inbox`, then save videos there from the iPhone
@@ -123,5 +130,5 @@ Files app. The Mac picks them up once they have finished syncing.
   `DVA_VOICE=<name> ./scripts/setup_mac.sh` to download another)
 - `topics.rss_feeds`, `topics.blocked_keywords`, `research.trusted_domains`
 - `prompt_mode.style_bible`, `mascot_description`, `negative_prompt`, `target_clip_seconds` (match your
-  video tool's maximum clip length), `post_process`, `include_mascot`
+  video tool's maximum clip length), `include_mascot`
 - `workflow.mode: full` + `render.blender.*` if you want the system to render the 3D video itself

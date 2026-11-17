@@ -36,6 +36,13 @@ def main(argv: list[str] | None = None) -> int:
     sm = sub.add_parser("submit", help="give your finished video (or clips, in order) for a pending video")
     sm.add_argument("paths", nargs="+", help="video file(s) or a folder of clips")
     sm.add_argument("--video-id", type=int, default=None, help="pending video id (default: newest pending)")
+    sm.add_argument("--caption", default=None, help="your caption (first line = YouTube title)")
+    sm.add_argument("--caption-file", default=None, help="read your caption from a text file")
+    cp = sub.add_parser("caption", help="set the caption for a video waiting for one, then publish")
+    cp.add_argument("video_id", type=int)
+    cp.add_argument("text", nargs="?", default=None)
+    cp.add_argument("--file", default=None, help="read the caption from a text file")
+    cp.add_argument("--suggested", action="store_true", help="publish with the system's suggested caption")
     sub.add_parser("watch", help="watch the inbox folder (use when Telegram isn't set up)")
     sub.add_parser("bot", help="run the Telegram approval listener (long-running)")
     for name in ("approve", "reject", "regen"):
@@ -104,10 +111,33 @@ def main(argv: list[str] | None = None) -> int:
         files: list[Path] = []
         for p in map(Path, args.paths):
             files += sorted(x for x in p.iterdir() if x.is_file()) if p.is_dir() else [p]
-        msg = proc.process(target["id"], files)
+        caption = Path(args.caption_file).read_text(encoding="utf-8") if args.caption_file else args.caption
+        msg = proc.process(target["id"], [f for f in files if f.suffix.lower() != ".txt"], caption=caption)
         print(msg)
         pipe.notify(msg)
-        return 0 if db.get_video(target["id"])["status"] in ("published", "approved", "awaiting_approval") else 1
+        ok = ("published", "approved", "awaiting_approval", "awaiting_caption")
+        return 0 if db.get_video(target["id"])["status"] in ok else 1
+    elif args.cmd == "caption":
+        from pathlib import Path
+        from .footage.processor import FootageProcessor
+        proc = FootageProcessor(pipe)
+        v = db.get_video(args.video_id)
+        if not v:
+            print("unknown video")
+            return 1
+        if args.suggested:
+            msg = proc.use_suggested(args.video_id)
+        else:
+            text = Path(args.file).read_text(encoding="utf-8") if args.file else args.text
+            if not text:
+                print("give the caption text, --file or --suggested")
+                return 1
+            if v["status"] == "awaiting_footage":
+                db.update_video(args.video_id, user_caption=text.strip())
+                msg = f"Saved as the caption for #{args.video_id}; it is used when the video arrives."
+            else:
+                msg = proc.apply_caption(args.video_id, text.strip())
+        print(msg)
     elif args.cmd in ("approve", "reject", "regen"):
         print(pipe.decide(args.video_id, args.cmd))
     elif args.cmd == "publish":

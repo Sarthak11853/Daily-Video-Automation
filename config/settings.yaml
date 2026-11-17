@@ -24,11 +24,20 @@ prompt_mode:
   inbox_dir: "inbox"               # drop finished videos here; tip: point it at an iCloud Drive folder
                                    # (e.g. "~/Library/Mobile Documents/com~apple~CloudDocs/DVA Inbox")
                                    # so you can drop files from your phone via the Files app
-  confirm_before_publish: false    # true = send a final preview with Publish / Cancel buttons first
-  post_process: auto               # auto: if your video is silent, add the Hinglish voiceover + music +
-                                   #       subtitles; if it has sound, upload it as-is
-                                   # none | subtitles_only (you used our voiceover.wav from 0:00) |
-                                   # voice_and_subtitles (replace your audio with ours)
+  confirm_before_publish: false    # true = send a final preview with Publish / Reject buttons first
+  # --- you make video + voiceover + captions yourself (default) ---
+  post_process: none               # none: upload your video exactly as you made it (re-encoded only if a
+                                   #       platform would reject the file). Other options, if you ever want
+                                   #       help: subtitles_only | voice_and_subtitles | auto (= add our
+                                   #       voiceover + music + subtitles only when your video is silent)
+  generate_voiceover: false        # true = also send a Hinglish TTS voiceover + .srt with the prompts
+  add_branding: false              # true = burn the @handle watermark + progress bar into your video
+  allow_silent_video: false        # false = a video with no sound is refused (probably a missing voiceover)
+  caption_source: yours_only       # yours_only: publish with YOUR caption; if a video arrives without one
+                                   #             the bot asks for it (or tap "use suggested caption")
+                                   # yours_or_generated: your caption if given, else the suggested one
+                                   # generated: always the system's suggested captions
+  append_sources_to_caption: false # true = add the verified sources under your YouTube description
   include_mascot: true             # recurring host character in every prompt = channel identity
   target_clip_seconds: 8           # most AI video tools make 5-10 s clips; long scenes get split
   contains_synthetic_media: true   # YouTube "altered or synthetic content" flag for AI-made visuals

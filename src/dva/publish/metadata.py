@@ -51,3 +51,38 @@ def build_metadata(script: dict, sheet: FactSheet, cfg, mode: str | None = None)
         "title": script.get("title") or sheet.topic,
         "hashtags": tags,
     }
+
+
+def metadata_from_caption(caption: str, fallback: dict, cfg, sources: list | None = None) -> dict:
+    """Use YOUR caption as-is. The first line becomes the YouTube title (max 100 chars); the whole text is
+    the YouTube description and the Instagram caption. Hashtags in your text become YouTube tags."""
+    text = caption.strip().replace("\r\n", "\n")
+    lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
+    first = next((ln for ln in lines if re.sub(r"#\w+", "", ln).strip()), "")
+    title = re.sub(r"\s+", " ", first).replace("<", "").replace(">", "").strip()
+    if len(title) > 100:
+        title = title[:99].rsplit(" ", 1)[0] + "…"
+    if not title:
+        title = fallback["youtube"]["title"]
+    tags = re.findall(r"#(\w+)", text)
+    yt_tags, total = [], 0
+    for t in dict.fromkeys(tags):
+        if total + len(t) + 1 > 450:
+            break
+        yt_tags.append(t)
+        total += len(t) + 1
+    desc = text
+    if sources and cfg.get("prompt_mode.append_sources_to_caption", False):
+        desc += "\n\n📚 Sources:\n" + "\n".join(f"• {s['title']} — {s['url']}" for s in sources)
+    warnings = []
+    if len(text) > 2200:
+        warnings.append("caption longer than Instagram's 2,200 characters, so it was cut")
+    if len(set(tags)) > 30:
+        warnings.append("more than 30 hashtags: Instagram may reject the post")
+    return {
+        "youtube": {"title": title, "description": desc.replace("<", "").replace(">", "")[:4900], "tags": yt_tags,
+                    "contains_synthetic_media": fallback["youtube"].get("contains_synthetic_media", False)},
+        "instagram": {"caption": text[:2200]},
+        "title": fallback.get("title"), "hashtags": ["#" + t for t in tags],
+        "caption_source": "yours", "warnings": warnings,
+    }

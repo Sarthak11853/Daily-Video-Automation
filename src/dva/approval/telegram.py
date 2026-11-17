@@ -66,6 +66,13 @@ class Telegram:
             {"text": "⏭ Skip this topic", "callback_data": f"reject:{video_id}"},
         ]]}
 
+    @staticmethod
+    def caption_keyboard(video_id: int) -> dict:
+        return {"inline_keyboard": [[
+            {"text": "💬 Use suggested caption", "callback_data": f"autocap:{video_id}"},
+            {"text": "❌ Cancel video", "callback_data": f"reject:{video_id}"},
+        ]]}
+
     def send_message(self, text: str, reply_markup: dict | None = None, chat_id: str | None = None,
                      parse_mode: str | None = None, reply_to: int | None = None) -> list[int]:
         ids = []

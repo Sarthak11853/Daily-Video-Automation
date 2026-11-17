@@ -200,7 +200,8 @@ class Pipeline:
     # ------------------------------------------------------- prompt mode
     def prompt_package(self, run_id: int, sheet: FactSheet, script: dict, out_dir: Path,
                        topic_id: int | None) -> int:
-        """Voiceover + subtitles + AI-video prompts + captions, sent to you; video waits for your footage."""
+        """AI-video prompts (+ suggested script/captions, optional TTS voiceover) sent to you; the video
+        then waits for your footage."""
         from .editor.compose import build_audio
         from .editor.subtitles import write_subtitles
         from .editor.timeline import build_timeline
@@ -213,10 +214,11 @@ class Pipeline:
         (out_dir / "metadata.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
         self.db.update_run(run_id, stage="voice")
         voice = None
-        try:
-            voice = voice_scenes(script, self.tts, out_dir / "voice")
-        except Exception as exc:  # noqa: BLE001 — prompts are still useful without our voiceover
-            log.warning("No voiceover generated (%s); prompts will use estimated timings", exc)
+        if cfg.get("prompt_mode.generate_voiceover", False):
+            try:
+                voice = voice_scenes(script, self.tts, out_dir / "voice")
+            except Exception as exc:  # noqa: BLE001 — prompts are still useful without our voiceover
+                log.warning("No voiceover generated (%s); prompts will use estimated timings", exc)
         v = cfg.section("video")
         if voice:
             timing = voice
@@ -232,8 +234,8 @@ class Pipeline:
         if not float(v.get("min_duration", 45)) <= tl.total <= float(v.get("max_duration", 75)):
             raise DurationMismatch(tl.total, wps)
         (out_dir / "timeline.json").write_text(json.dumps(tl.to_dict(), ensure_ascii=False, indent=2))
-        write_subtitles(tl, cfg, out_dir)
         if voice:
+            write_subtitles(tl, cfg, out_dir)
             (out_dir / "voice.json").write_text(json.dumps(voice, indent=2))
             seed = int(hashlib.sha1(f"{run_id}:{sheet.topic}".encode()).hexdigest()[:6], 16)
             build_audio(tl, voice, script["scenes"], cfg, out_dir, seed, sfx_enabled=False,
@@ -271,18 +273,28 @@ class Pipeline:
         has_voice = (out_dir / "voiceover.wav").exists()
         inbox = self.cfg.path("prompt_mode.inbox_dir", "inbox")
         demo = "🧪 DEMO CONTENT — facts hand-curated, re-check before publishing\n" if facts.get("demo") else ""
+        we_add = self.cfg.get("prompt_mode.post_process", "none") != "none"
+        step3 = ("Keep it <b>silent</b>: I'll add the Hinglish voiceover, music and subtitles."
+                 if we_add and has_voice else
+                 "Add your voiceover and subtitles (suggested script below; use it or write your own).")
         ids = tg.send_message(
             f"{demo}🎬 <b>Video #{video_id}: {escape(v['title'] or '')}</b>\n"
             f"📂 {escape(v['category'] or '')} · ⏱ ~{pkg['total_seconds']:.0f}s · {len(pkg['scenes'])} scenes · "
             f"{n_clips} clips\n💡 {escape(facts.get('angle', ''))}\n\n"
-            "<b>What to do</b>\n1. Generate the clips below in your AI video tool (each prompt is complete — "
-            "style and character are included).\n2. Join them in order — or send all clips and I'll join them.\n"
-            "3. " + ("Keep it <b>silent</b>: I'll add the Hinglish voiceover, music and subtitles. "
-                     "(Or put <code>voiceover_with_music.wav</code> under it from 0:00.)\n" if has_voice else
-                     "Add your own voiceover using the script below.\n") +
-            f"4. Reply to this chat with the video as a <b>file</b> (≤ 20 MB), or drop it into "
-            f"<code>{escape(str(inbox))}</code>. I'll check it and publish to YouTube + Instagram with captions.",
+            "<b>What to do</b>\n1. Generate the clips below in your AI video tool (each prompt is complete, "
+            "with style and character included).\n2. Edit them together.\n"
+            f"3. {step3}\n"
+            "4. Send me the finished video as a <b>file</b> (≤ 20 MB) <b>with your caption</b> in the same message "
+            "(or send the caption as text right after). Bigger file? Drop it into "
+            f"<code>{escape(str(inbox))}</code> with the caption in a .txt file of the same name.\n"
+            "I publish it to YouTube Shorts + Instagram Reels exactly as you made it.",
             parse_mode="HTML")
+        claims = [c for c in facts["claims"] if c.get("verified")]
+        ids += tg.send_message("✅ VERIFIED FACTS (safe to say in your voiceover)\n"
+                               + "\n".join(f"• {c['text']}" for c in claims)
+                               + "\n\n📚 SOURCES\n" + "\n".join(f"• {s['url']}" for s in facts["sources"]))
+        ids += tg.send_message("📜 SUGGESTED HINGLISH SCRIPT (optional)\n"
+                               + "\n".join(f"{s['id']}. ({s['seconds']:.0f}s) {s['voiceover']}" for s in pkg["scenes"]))
         for s in pkg["scenes"]:
             head = (f"<b>Scene {s['id']} · {s['seconds']:.1f}s</b>"
                     + (f" · text: <b>{escape(s['on_screen_text'])}</b>" if s.get("on_screen_text") else "")
@@ -310,8 +322,9 @@ class Pipeline:
                 except Exception as exc:  # noqa: BLE001
                     log.warning("could not send %s: %s", name, exc)
         ids += tg.send_message(
-            f"📝 Captions ready for #{video_id}\nYT: {meta['youtube']['title']}\n\n{meta['instagram']['caption'][:900]}"
-            f"\n\n➡️ Reply to this message with your video (or caption it #{video_id}).",
+            f"💬 Suggested caption for #{video_id} (optional; your own caption is used if you send one)\n\n"
+            f"{meta['youtube']['title']}\n\n{meta['instagram']['caption'][:1500]}"
+            f"\n\n➡️ Reply to this message with your video + caption.",
             reply_markup=Telegram.prompt_keyboard(video_id))
         self.db.update_video(video_id, telegram_message_ids=json.dumps(ids))
 
@@ -364,8 +377,8 @@ class Pipeline:
                 return f"#{video_id} is already '{v['status']}'"
             return self.publish_approved(video_id)
         if action == "reject":
-            if not self.db.transition_video(video_id, ("awaiting_approval", "approved", "awaiting_footage"),
-                                            "rejected"):
+            if not self.db.transition_video(video_id, ("awaiting_approval", "approved", "awaiting_footage",
+                                                       "awaiting_caption"), "rejected"):
                 return f"#{video_id} is already '{v['status']}'"
             if v["topic_id"]:
                 self.db.execute("UPDATE topics SET status='blacklisted' WHERE id=?", (v["topic_id"],))

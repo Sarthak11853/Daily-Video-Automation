@@ -27,10 +27,13 @@ def doctor(pipe) -> int:
         " ".join(br.cmd or []) or ("not needed in prompt mode" if mode == "prompt"
                                    else "not found — fallback renderer will be used"))
     from .tts.engines import ENGINES
-    for name in cfg.get("tts.engine_order", []):
+    needs_tts = mode == "full" or cfg.get("prompt_mode.generate_voiceover", False)
+    for name in cfg.get("tts.engine_order", []) if needs_tts else []:
         eng = ENGINES[name](cfg.section(f"tts.{name}"), cfg.root)
         extra = str(eng.model_path()) if name == "piper" else ""
         add(f"tts:{name}", eng.available(), extra)
+    if not needs_tts:
+        add("tts", True, "not needed: you record the voiceover")
     llm = pipe.llm
     for p in llm.providers:
         used = db.quota_used(f"llm:{p.name}", pipe.today())

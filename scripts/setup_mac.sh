@@ -28,6 +28,7 @@ PY="$(brew --prefix python@3.12)/bin/python3.12"
 .venv/bin/pip install -q --upgrade pip
 .venv/bin/pip install -q -e ".[tts,dev]"
 
+if grep -qE '^\s*(mode:\s*full|generate_voiceover:\s*true)' config/settings.yaml; then
 say "Downloading Piper Hindi voice: $VOICE"
 mkdir -p assets/voices
 lang="${VOICE%%-*}"; rest="${VOICE#*-}"; name="${rest%%-*}"; quality="${rest#*-}"
@@ -35,6 +36,7 @@ base="https://huggingface.co/rhasspy/piper-voices/resolve/main/${lang%%_*}/${lan
 for ext in onnx onnx.json; do
   [ -f "assets/voices/${VOICE}.${ext}" ] || curl -fL --retry 3 -o "assets/voices/${VOICE}.${ext}" "${base}.${ext}?download=true"
 done
+fi
 
 say "Downloading Poppins font (SIL Open Font License)"
 mkdir -p assets/fonts
