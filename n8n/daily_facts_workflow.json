@@ -16,7 +16,7 @@
         "command": "cd \"$HOME/Daily-Video-Automation\" && .venv/bin/python -m dva run --json 2>> data/logs/n8n-run.stderr.log | tail -n 1"
       },
       "id": "a1f1c0de-0001-4000-8000-000000000002",
-      "name": "Run pipeline (discover → research → script → 3D render → QC → Telegram)",
+      "name": "Run pipeline (trend → verified facts → script → prompts/video → Telegram)",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [260, 0],
@@ -103,8 +103,8 @@
     }
   ],
   "connections": {
-    "Every day 09:00 IST": { "main": [ [ { "node": "Run pipeline (discover → research → script → 3D render → QC → Telegram)", "type": "main", "index": 0 } ] ] },
-    "Run pipeline (discover → research → script → 3D render → QC → Telegram)": { "main": [ [ { "node": "Parse result", "type": "main", "index": 0 } ] ] },
+    "Every day 09:00 IST": { "main": [ [ { "node": "Run pipeline (trend → verified facts → script → prompts/video → Telegram)", "type": "main", "index": 0 } ] ] },
+    "Run pipeline (trend → verified facts → script → prompts/video → Telegram)": { "main": [ [ { "node": "Parse result", "type": "main", "index": 0 } ] ] },
     "Parse result": { "main": [ [ { "node": "Pipeline crashed?", "type": "main", "index": 0 } ] ] },
     "Pipeline crashed?": { "main": [ [ { "node": "Alert me on Telegram", "type": "main", "index": 0 } ], [] ] },
     "Every 6 hours": { "main": [ [ { "node": "Collect views / likes / shares", "type": "main", "index": 0 } ] ] },

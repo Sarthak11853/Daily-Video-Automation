@@ -13,6 +13,41 @@ channel:
   daily_time: "09:00"
   default_hashtags: ["#facts", "#hindifacts", "#rochakfacts", "#didyouknow", "#science"]
 
+workflow:
+  # "prompt" (default): every morning you receive AI-video prompts + a ready voiceover for a verified,
+  #                     trending fact. You generate the video in any tool you like and send it back
+  #                     (Telegram or the inbox folder); the system finishes it and publishes it.
+  # "full":             the system renders the whole 3D video itself with Blender.
+  mode: prompt
+
+prompt_mode:
+  inbox_dir: "inbox"               # drop finished videos here; tip: point it at an iCloud Drive folder
+                                   # (e.g. "~/Library/Mobile Documents/com~apple~CloudDocs/DVA Inbox")
+                                   # so you can drop files from your phone via the Files app
+  confirm_before_publish: false    # true = send a final preview with Publish / Cancel buttons first
+  post_process: auto               # auto: if your video is silent, add the Hinglish voiceover + music +
+                                   #       subtitles; if it has sound, upload it as-is
+                                   # none | subtitles_only (you used our voiceover.wav from 0:00) |
+                                   # voice_and_subtitles (replace your audio with ours)
+  include_mascot: true             # recurring host character in every prompt = channel identity
+  target_clip_seconds: 8           # most AI video tools make 5-10 s clips; long scenes get split
+  contains_synthetic_media: true   # YouTube "altered or synthetic content" flag for AI-made visuals
+  min_duration: 10
+  max_duration: 180                # YouTube Shorts limit is 3 minutes
+  max_input_mb: 1000
+  style_bible: >-
+    Cinematic, colorful 3D cartoon animation like a modern animated feature film. Soft global
+    illumination, warm key light with colorful rim light, vibrant saturated colors, smooth rounded
+    shapes, glossy materials, expressive characters, shallow depth of field, gentle camera motion,
+    vertical 9:16 framing with the subject in the upper-middle of the frame, family-friendly.
+  mascot_description: >-
+    Gyaanu, a small cute round robot with a glossy teal body, a dark navy face screen showing two
+    glowing cyan oval eyes and a small glowing smile, a short antenna topped with a glowing yellow
+    bulb, small rounded teal arms, navy feet and a yellow badge on its belly
+  negative_prompt: >-
+    text, letters, subtitles, watermark, logo, brand names, real celebrities, realistic human faces,
+    gore, violence, scary, blurry, low resolution, distorted anatomy, extra limbs, flicker, jitter
+
 paths:
   data_dir: "data"                # SQLite DB, logs, caches
   output_dir: "output"            # one folder per day

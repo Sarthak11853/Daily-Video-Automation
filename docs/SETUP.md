@@ -1,6 +1,6 @@
 # Setup guide (all free)
 
-Run `./scripts/setup_mac.sh` first, then fill in `.env` (it is created with `chmod 600`).
+Run `./scripts/setup_mac.sh` first (Blender is only installed when `workflow.mode: full`), then fill in `.env` (it is created with `chmod 600`).
 After each step, `.venv/bin/python -m dva doctor` shows what is ready.
 
 > Prefer the macOS Keychain? Store a secret with
@@ -90,7 +90,31 @@ n8n 2.x hides the *Execute Command* node by default; the provided launchd file s
 **Keep the Mac awake:** `sudo pmset repeat wakeorpoweron MTWRFSU 08:50:00`, and keep it on power.
 A missed run is executed when the Mac wakes; runs are idempotent per day.
 
-## 6. Make it yours
+## 6. Your daily routine (prompt mode)
+
+1. ~9:00 AM the bot sends today's video #N: topic, verified facts, **one message per scene with
+   tap-to-copy clip prompts**, a negative prompt, a single long prompt, `PROMPTS.md`,
+   `voiceover_with_music.wav`, `voiceover.wav` and `subtitles.srt`.
+2. Generate the clips in your AI video tool. Keep each at the duration shown.
+3. Deliver **one** of these ways:
+   - Join the clips yourself and **reply to the bot's last message** with the video *as a file* (≤ 20 MB).
+   - Drop the finished video into the inbox folder (name it `N.mp4`, or anything; the newest pending video is used).
+   - Drop a **folder of clips** (named `01.mp4`, `02.mp4`, …) into the inbox, and they're joined in name order.
+   - From the terminal: `dva submit clip1.mp4 clip2.mp4 --video-id N`.
+4. Within a few minutes the bot replies with the YouTube and Instagram links (or with what to fix: the
+   video goes back to "waiting" so you can simply resend).
+
+Don't like the topic? Tap **⏭ Skip this topic** (it's never suggested again) and send `/new`.
+Want different prompts for the same facts? Tap **🔁 New script & prompts**.
+
+To publish only after a final look, set `prompt_mode.confirm_before_publish: true` (you get a preview
+with *Publish / Reject* buttons).
+
+**Inbox on your phone:** set `prompt_mode.inbox_dir` to an iCloud Drive folder, e.g.
+`~/Library/Mobile Documents/com~apple~CloudDocs/DVA Inbox`, then save videos there from the iPhone
+Files app. The Mac picks them up once they have finished syncing.
+
+## 7. Make it yours
 
 `config/settings.yaml`:
 - `channel.name`, `channel.handle`, `channel.mascot_name`, hashtags
@@ -98,4 +122,6 @@ A missed run is executed when the Mac wakes; runs are idempotent per day.
 - `tts.piper.voice` (`hi_IN-pratham-medium`, `hi_IN-priyamvada-medium`, …; re-run setup with
   `DVA_VOICE=<name> ./scripts/setup_mac.sh` to download another)
 - `topics.rss_feeds`, `topics.blocked_keywords`, `research.trusted_domains`
-- `render.blender.mode: stills` for fast previews, `render_fps`, samples, `parallel_scenes`
+- `prompt_mode.style_bible`, `mascot_description`, `negative_prompt`, `target_clip_seconds` (match your
+  video tool's maximum clip length), `post_process`, `include_mascot`
+- `workflow.mode: full` + `render.blender.*` if you want the system to render the 3D video itself

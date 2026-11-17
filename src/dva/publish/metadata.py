@@ -6,6 +6,7 @@ import re
 from ..core.models import FactSheet
 
 DISCLOSURE = "Animation, music and voice are generated with open-source tools; facts are checked against the sources above."
+DISCLOSURE_PROMPT = "Visuals made with AI video tools; facts are checked against the sources above."
 
 
 def _clean_tags(tags: list[str], extra: list[str]) -> list[str]:
@@ -17,7 +18,9 @@ def _clean_tags(tags: list[str], extra: list[str]) -> list[str]:
     return out
 
 
-def build_metadata(script: dict, sheet: FactSheet, cfg) -> dict:
+def build_metadata(script: dict, sheet: FactSheet, cfg, mode: str | None = None) -> dict:
+    mode = mode or cfg.get("workflow.mode", "full")
+    disclosure = DISCLOSURE_PROMPT if mode == "prompt" else DISCLOSURE
     tags = _clean_tags(script.get("hashtags", []), cfg.get("channel.default_hashtags", []))
     src_lines = "\n".join(f"• {s.title} — {s.url}" for s in sheet.sources)
     src_domains = ", ".join(dict.fromkeys(s.domain for s in sheet.sources))
@@ -28,7 +31,7 @@ def build_metadata(script: dict, sheet: FactSheet, cfg) -> dict:
         yt_title += " #Shorts"
     yt_title = yt_title[:100]
     yt_desc = (f"{script.get('youtube_description', '').strip()}\n\n"
-               f"📚 Sources:\n{src_lines}\n\n{DISCLOSURE}\n\n{' '.join(tags[:12])}")
+               f"📚 Sources:\n{src_lines}\n\n{disclosure}\n\n{' '.join(tags[:12])}")
     yt_desc = yt_desc.replace("<", "").replace(">", "")[:4900]
     yt_tags, total = [], 0
     for t in tags + [sheet.topic, sheet.category, "hindi facts", "hinglish"]:
@@ -41,7 +44,9 @@ def build_metadata(script: dict, sheet: FactSheet, cfg) -> dict:
     ig_caption = (f"{script.get('instagram_caption', '').strip()}\n\n"
                   f"📚 Sources: {src_domains}\n\n{' '.join(tags[:25])}")[:2150]
     return {
-        "youtube": {"title": yt_title, "description": yt_desc, "tags": yt_tags},
+        "youtube": {"title": yt_title, "description": yt_desc, "tags": yt_tags,
+                    "contains_synthetic_media": bool(cfg.get("prompt_mode.contains_synthetic_media", True))
+                    if mode == "prompt" else bool(cfg.get("publish.youtube.contains_synthetic_media", False))},
         "instagram": {"caption": ig_caption},
         "title": script.get("title") or sheet.topic,
         "hashtags": tags,

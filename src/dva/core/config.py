@@ -91,7 +91,7 @@ class Config:
         return copy.deepcopy(val) if isinstance(val, dict) else {}
 
     def path(self, dotted: str, default: str = "") -> Path:
-        p = Path(self.get(dotted, default))
+        p = Path(os.path.expanduser(str(self.get(dotted, default))))
         return p if p.is_absolute() else (self.root / p)
 
     def secret(self, env_name: str | None) -> str | None:

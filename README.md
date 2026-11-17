@@ -1,32 +1,50 @@
 # Daily AI Animated Facts — ₹0/month Shorts & Reels factory
 
 Every morning at **9:00 AM IST** this system finds a trending or evergreen *interesting fact*,
-verifies it against trusted sources, writes a **Hinglish** script, renders a **~60-second vertical
-3D cartoon video** in Blender with a recurring mascot host, voices it with a local neural TTS,
-adds music, SFX and animated subtitles, runs automated QC, and sends it to you on **Telegram**
-with **Approve / Regenerate / Reject** buttons. On approval it publishes to **YouTube Shorts**
-and **Instagram Reels** through their official APIs and later tracks views, likes and shares
-to steer future topics and hooks.
+verifies it against trusted sources and writes a **Hinglish** script. What happens next depends on
+`workflow.mode` in `config/settings.yaml`:
 
-Everything runs **locally on your Mac** with free and open-source tools. No paid APIs, no hosting.
+### Prompt mode (default): you make the video, the system does everything else
+
+1. **9:00 AM, on Telegram:** today's topic, verified facts and sources, plus **copy-paste prompts for
+   your AI video tool**. There is one prompt per clip, each sized to the real voiceover timing (≤ 8 s per clip by
+   default), and each prompt repeats the channel style and the recurring host character so separately
+   generated clips still match. You also get a single long prompt, a negative prompt, a ready
+   **Hinglish voiceover** (`voiceover_with_music.wav`), subtitles (`.srt`) and the captions that will be posted.
+2. **You generate the video** in any tool and send it back, either **to the Telegram bot** (as a file, ≤ 20 MB)
+   or by dropping it (or a folder of clips) into the **inbox folder** (any size; can be an iCloud Drive folder
+   so you can do it from your phone).
+3. **The system finishes and publishes it:** joins clips, converts any shape to 1080×1920 (blurred fill
+   for 16:9), and, **if your video is silent, adds the voiceover, music and word-by-word subtitles**
+   (fitting the video to the voiceover length). It then runs QC and uploads to **YouTube Shorts** and
+   **Instagram Reels** with platform-specific titles, descriptions, captions and hashtags, and replies
+   with the links. Buttons: *🔁 New script & prompts* and *⏭ Skip this topic*.
+
+### Full mode: fully automatic 3D rendering
+
+`workflow.mode: full`: the system renders the video itself in Blender (procedural 3D scenes with the
+mascot *Gyaanu*), voices it with Piper, edits it with FFmpeg and sends it for **Approve / Regenerate /
+Reject** before publishing.
+
+Both modes run **locally on your Mac** with free and open-source tools. No paid APIs, no hosting.
 
 ```
  n8n / launchd (09:00 IST)
         │
         ▼
- ┌─────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
- │  Discover   │──▶│ Research &   │──▶│ Hinglish     │──▶│ Piper TTS    │
- │ Trends, RSS,│   │ verify facts │   │ script (6-10 │   │ per scene    │
- │ Wikipedia   │   │ (quotes must │   │ scenes) +    │   │ (Devanagari) │
- │ + history   │   │  match text) │   │ fact audit   │   └──────┬───────┘
- └─────────────┘   └──────────────┘   └──────────────┘          ▼
- ┌─────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
- │ Telegram    │◀──│ QC: facts,   │◀──│ FFmpeg edit: │◀──│ Blender 3D   │
- │ approve /   │   │ sync, length,│   │ transitions, │   │ scenes from  │
- │ regen/reject│   │ res, black,  │   │ karaoke subs,│   │ procedural   │
- └──────┬──────┘   │ silence, size│   │ music + SFX  │   │ asset library│
-        ▼          └──────────────┘   └──────────────┘   └──────────────┘
- YouTube Shorts + Instagram Reels ──▶ metrics every 6 h ──▶ topic & hook weights
+ Discover (Trends, RSS, Wikipedia, history) ─▶ Research & verify (quotes must match sources)
+        ─▶ Hinglish script + fact audit ─▶ Piper voiceover
+                     │
+      prompt mode ───┴──────────────────────────── full mode
+        ▼                                             ▼
+ AI-video prompts + voiceover ─▶ Telegram        Blender 3D render ─▶ FFmpeg edit ─▶ QC
+        ▼                                             ▼
+ you send your video (Telegram / inbox)          Telegram Approve / Regenerate / Reject
+        ▼                                             │
+ conform 9:16 + voice/music/subs (if silent) + QC     │
+        └──────────────────────┬──────────────────────┘
+                               ▼
+          YouTube Shorts + Instagram Reels ─▶ metrics every 6 h ─▶ topic & hook weights
 ```
 
 ## What's in the box
@@ -51,9 +69,10 @@ Everything runs **locally on your Mac** with free and open-source tools. No paid
 
 ```bash
 git clone <this repo> ~/Daily-Video-Automation && cd ~/Daily-Video-Automation
-./scripts/setup_mac.sh                 # ffmpeg, Blender, venv, Piper Hindi voice, OFL fonts, .env
-.venv/bin/python -m dva demo --fast    # keyless demo video in ~2-5 min -> output/<date>_run1/final.mp4
-.venv/bin/python -m dva demo           # full-quality animated demo (EEVEE on Apple GPU)
+./scripts/setup_mac.sh                 # ffmpeg, venv, Piper Hindi voice, OFL fonts, .env, inbox/
+.venv/bin/python -m dva demo           # keyless demo prompt package -> output/<date>_run1/PROMPTS.md
+.venv/bin/python -m dva submit ~/Downloads/my_video.mp4   # finish + publish your video for it
+.venv/bin/python -m dva demo --mode full --fast            # (full mode) demo 3D render, needs Blender
 ```
 
 Then add credentials (all free) — step by step in **[docs/SETUP.md](docs/SETUP.md)**:
@@ -73,9 +92,11 @@ Then add credentials (all free) — step by step in **[docs/SETUP.md](docs/SETUP
 
 | Command | What it does |
 |---|---|
-| `dva run [--force] [--json]` | the daily pipeline (idempotent per day; `--json` for n8n) |
-| `dva demo [--fast] [--fallback] [--tts espeak]` | render the built-in octopus demo without API keys |
-| `dva bot` | Telegram listener (Approve / Regenerate / Reject, `/status`, `/new`, `/metrics`, `/pending`) |
+| `dva run [--force] [--json] [--mode prompt\|full]` | the daily pipeline (idempotent per day; `--json` for n8n) |
+| `dva submit <video or clips…> [--video-id N]` | prompt mode: hand in your video (clips are joined in name order) |
+| `dva watch` | prompt mode without Telegram: watch the inbox folder |
+| `dva demo [--mode prompt\|full] [--fast] [--fallback] [--tts espeak]` | built-in octopus demo without API keys |
+| `dva bot` | Telegram listener: receives your videos, watches the inbox, buttons, `/status`, `/new`, `/pending`, `/prompts <id>`, `/skip <id>`, `/metrics` |
 | `dva approve|reject|regen <id>` | same as the Telegram buttons |
 | `dva publish <id>` | retry publishing an approved video (never re-uploads a published platform) |
 | `dva mark-published <id> <platform> <url>` / `dva reset-publication <id> <platform>` | resolve an ambiguous upload by hand |
@@ -97,7 +118,9 @@ Then add credentials (all free) — step by step in **[docs/SETUP.md](docs/SETUP
 
 ```
 config/settings.yaml      all tunables (channel, schedule, quotas, style, QC thresholds)
-src/dva/pipeline.py       orchestration, failure → production package
+src/dva/pipeline.py       orchestration (both modes), failure → production package
+src/dva/prompting/        prompt mode: AI-video prompt writer + PROMPTS.md
+src/dva/footage/          prompt mode: conform/join your footage, add voice+subs, QC; inbox watcher
 src/dva/discovery/        trend/RSS/Wikipedia sources, selector (dedup + LLM rank + performance weights)
 src/dva/research/         source fetching + fact verification
 src/dva/script/           Hinglish script writer, validator, fact audit
@@ -116,7 +139,15 @@ tests/                    offline test-suite incl. a full end-to-end run with fa
 
 ## Known limits (honest list)
 
-- **Render time:** a full-quality 60 s video is ~1,400 frames. On Apple Silicon with EEVEE expect roughly 10-40 min; set `render.blender.mode: stills` (one rendered frame per scene + camera motion) for ~2 min renders, or lower `resolution_percentage`.
+- **Telegram file limit (prompt mode):** bots can only *download* files up to 20 MB. A 60 s 1080p video
+  is often bigger, so use the inbox folder for those (the bot tells you when a file is too big).
+- **Your footage's audio:** in `post_process: auto`, a video *with* sound is uploaded as-is (no subtitles
+  are added, because they could not be timed to your audio). If you placed `voiceover_with_music.wav` under
+  your video from 0:00, set `post_process: subtitles_only` to get burned-in subtitles too.
+- **Prompt quality** comes from Gemini; when it's unavailable you get simpler template prompts built from the
+  scene plan (still complete and usable).
+
+- **Render time (full mode):** a full-quality 60 s video is ~1,400 frames. On Apple Silicon with EEVEE expect roughly 10-40 min; set `render.blender.mode: stills` (one rendered frame per scene + camera motion) for ~2 min renders, or lower `resolution_percentage`.
 - **YouTube:** uploads from an unverified Google Cloud project are locked to **private** until the project passes Google's (free) API compliance audit. The bot warns you when this happens.
 - **Instagram:** requires a Professional (Business/Creator) account; Meta's app/permission setup is the most fiddly step — see docs/SETUP.md.
 - **Hindi TTS quality:** Piper's Hindi voices are decent but not studio-grade, and English words are spoken via their Devanagari spelling. You can swap the voice in `tts.piper.voice`.

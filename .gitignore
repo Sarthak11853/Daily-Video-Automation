@@ -12,3 +12,4 @@ assets/fonts/*.ttf
 *.log
 .DS_Store
 n8n/*.local.json
+inbox/

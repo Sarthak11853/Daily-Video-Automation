@@ -17,7 +17,7 @@ say "Installing ffmpeg + Python (Homebrew)"
 brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg
 brew list python@3.12 >/dev/null 2>&1 || brew install python@3.12
 
-if [ ! -d /Applications/Blender.app ]; then
+if grep -qE '^\s*mode:\s*full' config/settings.yaml && [ ! -d /Applications/Blender.app ]; then
   say "Installing Blender (free, open source) — ~1 GB"
   brew install --cask blender || echo "Blender install failed; the fallback 2.5D renderer will be used."
 fi
@@ -48,7 +48,7 @@ if [ ! -f .env ]; then
   chmod 600 .env
   say "Created .env — fill in GEMINI_API_KEY and TELEGRAM_* (see docs/SETUP.md)"
 fi
-mkdir -p secrets data/logs && chmod 700 secrets
+mkdir -p secrets data/logs inbox && chmod 700 secrets
 
 # n8n workflow with this checkout's real path baked in
 sed "s#\$HOME/Daily-Video-Automation#${PROJECT_DIR}#g" n8n/daily_facts_workflow.json > n8n/daily_facts_workflow.local.json
@@ -79,4 +79,4 @@ if [[ "${1:-}" == "--services" ]]; then
   echo "Tip: wake the Mac before the run:  sudo pmset repeat wakeorpoweron MTWRFSU 08:50:00"
 fi
 
-say "Done. Try a keyless demo video:  .venv/bin/python -m dva demo --fast"
+say "Done. Try the keyless demo:  .venv/bin/python -m dva demo   (prompt mode: prompts + voiceover in output/)"

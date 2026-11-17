@@ -128,7 +128,8 @@ class YouTube:
                         "defaultAudioLanguage": "hi"},
             "status": {"privacyStatus": self.y.get("privacy_status", "public"),
                        "selfDeclaredMadeForKids": bool(self.y.get("made_for_kids", False)),
-                       "containsSyntheticMedia": bool(self.y.get("contains_synthetic_media", False))},
+                       "containsSyntheticMedia": bool(meta.get("contains_synthetic_media",
+                                                               self.y.get("contains_synthetic_media", False)))},
         }
         resp = self.http.post_once(f"{UPLOAD_URL}?uploadType=resumable&part=snippet,status",
                                    headers={**self._h(), "Content-Type": "application/json; charset=UTF-8",

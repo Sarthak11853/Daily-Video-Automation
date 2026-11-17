@@ -28,6 +28,10 @@ class Timeline:
     def to_dict(self) -> dict:
         return {"transition": self.transition, "total": self.total, "scenes": [asdict(s) for s in self.scenes]}
 
+    @classmethod
+    def from_dict(cls, d: dict) -> "Timeline":
+        return cls(scenes=[SceneTiming(**s) for s in d["scenes"]], transition=d["transition"], total=d["total"])
+
 
 def word_timings(text: str, start: float, dur: float) -> list[dict]:
     """Distribute words across the voice duration, weighting by length and pauses."""

@@ -33,6 +33,7 @@ class Telegram:
         if not token or not chat_id:
             raise ConfigError("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set in .env")
         self.base = f"https://api.telegram.org/bot{token}"
+        self.file_base = f"https://api.telegram.org/file/bot{token}"
         self.chat_id = str(chat_id)
         self.http = http or HttpClient(timeout=120)
 
@@ -51,19 +52,28 @@ class Telegram:
         return body["result"]
 
     @staticmethod
-    def keyboard(video_id: int) -> dict:
+    def keyboard(video_id: int, regen: bool = True) -> dict:
+        row = [{"text": "✅ Publish" if not regen else "✅ Approve", "callback_data": f"approve:{video_id}"}]
+        if regen:
+            row.append({"text": "🔁 Regenerate", "callback_data": f"regen:{video_id}"})
+        row.append({"text": "❌ Reject", "callback_data": f"reject:{video_id}"})
+        return {"inline_keyboard": [row]}
+
+    @staticmethod
+    def prompt_keyboard(video_id: int) -> dict:
         return {"inline_keyboard": [[
-            {"text": "✅ Approve", "callback_data": f"approve:{video_id}"},
-            {"text": "🔁 Regenerate", "callback_data": f"regen:{video_id}"},
-            {"text": "❌ Reject", "callback_data": f"reject:{video_id}"},
+            {"text": "🔁 New script & prompts", "callback_data": f"regen:{video_id}"},
+            {"text": "⏭ Skip this topic", "callback_data": f"reject:{video_id}"},
         ]]}
 
-    def send_message(self, text: str, reply_markup: dict | None = None, chat_id: str | None = None) -> list[int]:
+    def send_message(self, text: str, reply_markup: dict | None = None, chat_id: str | None = None,
+                     parse_mode: str | None = None, reply_to: int | None = None) -> list[int]:
         ids = []
-        chunks = split_text(text)
+        chunks = [text] if parse_mode else split_text(text)  # HTML messages are pre-sized by the caller
         for i, chunk in enumerate(chunks):
             res = self._call("sendMessage", chat_id=chat_id or self.chat_id, text=chunk,
-                             disable_web_page_preview=True,
+                             disable_web_page_preview=True, parse_mode=parse_mode,
+                             reply_to_message_id=reply_to if i == 0 else None,
                              reply_markup=reply_markup if i == len(chunks) - 1 else None)
             ids.append(res["message_id"])
         return ids
@@ -87,6 +97,19 @@ class Telegram:
             res = self._call("sendDocument", files={"document": (path.name, fh)}, retry=False,
                              chat_id=self.chat_id, caption=caption[:MAX_CAPTION], reply_markup=reply_markup)
         return res["message_id"]
+
+    def download(self, file_id: str, dest: Path) -> Path:
+        """Download a file sent to the bot (Bot API limit: 20 MB)."""
+        info = self._call("getFile", file_id=file_id)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        with self.http.session.get(f"{self.file_base}/{info['file_path']}", stream=True, timeout=300) as r:
+            r.raise_for_status()
+            tmp = dest.with_suffix(dest.suffix + ".part")
+            with open(tmp, "wb") as fh:
+                for chunk in r.iter_content(1 << 20):
+                    fh.write(chunk)
+            tmp.replace(dest)
+        return dest
 
     def get_updates(self, offset: int | None, timeout: int = 50) -> list[dict]:
         resp = self.http.session.get(f"{self.base}/getUpdates",

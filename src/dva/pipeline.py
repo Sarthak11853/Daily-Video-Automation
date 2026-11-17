@@ -197,14 +197,134 @@ class Pipeline:
         self.send_for_approval(video_id, thumb)
         return video_id
 
+    # ------------------------------------------------------- prompt mode
+    def prompt_package(self, run_id: int, sheet: FactSheet, script: dict, out_dir: Path,
+                       topic_id: int | None) -> int:
+        """Voiceover + subtitles + AI-video prompts + captions, sent to you; video waits for your footage."""
+        from .editor.compose import build_audio
+        from .editor.subtitles import write_subtitles
+        from .editor.timeline import build_timeline
+        from .prompting.video_prompts import VideoPromptWriter, save_package
+        from .publish.metadata import build_metadata
+        from .tts.engines import voice_scenes
+
+        cfg = self.cfg
+        meta = build_metadata(script, sheet, cfg, mode="prompt")
+        (out_dir / "metadata.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+        self.db.update_run(run_id, stage="voice")
+        voice = None
+        try:
+            voice = voice_scenes(script, self.tts, out_dir / "voice")
+        except Exception as exc:  # noqa: BLE001 — prompts are still useful without our voiceover
+            log.warning("No voiceover generated (%s); prompts will use estimated timings", exc)
+        v = cfg.section("video")
+        if voice:
+            timing = voice
+            words = sum(len(s["narration_display"].split()) for s in script["scenes"])
+            wps = words / max(0.1, sum(x["duration"] for x in voice))
+            old = self.db.kv_get("tts_wps")
+            self.db.kv_set("tts_wps", round(wps if old is None else 0.7 * old + 0.3 * wps, 3))
+        else:
+            wps = float(self.db.kv_get("tts_wps") or cfg.get("script.words_per_second", 2.55))
+            timing = [{"id": s["id"], "duration": round(len(s["narration_display"].split()) / wps, 2)}
+                      for s in script["scenes"]]
+        tl = build_timeline(script["scenes"], timing, transition=0.0, pad=float(v.get("scene_padding_seconds", 0.35)))
+        if not float(v.get("min_duration", 45)) <= tl.total <= float(v.get("max_duration", 75)):
+            raise DurationMismatch(tl.total, wps)
+        (out_dir / "timeline.json").write_text(json.dumps(tl.to_dict(), ensure_ascii=False, indent=2))
+        write_subtitles(tl, cfg, out_dir)
+        if voice:
+            (out_dir / "voice.json").write_text(json.dumps(voice, indent=2))
+            seed = int(hashlib.sha1(f"{run_id}:{sheet.topic}".encode()).hexdigest()[:6], 16)
+            build_audio(tl, voice, script["scenes"], cfg, out_dir, seed, sfx_enabled=False,
+                        out_name="voiceover.wav", music_on=False)
+            build_audio(tl, voice, script["scenes"], cfg, out_dir, seed, sfx_enabled=False,
+                        out_name="voiceover_with_music.wav")
+            for tmp in ("voice_track.wav", "sfx_track.wav", "music_track.wav"):
+                (out_dir / tmp).unlink(missing_ok=True)
+        self.db.update_run(run_id, stage="prompts")
+        pkg = VideoPromptWriter(cfg, self.llm).write(script, sheet, {st.id: st.clip_len for st in tl.scenes})
+        video_id = self.db.add_video(run_id=run_id, topic_id=topic_id, title=script.get("title") or sheet.topic,
+                                     category=sheet.category, status="awaiting_footage", mode="prompt",
+                                     duration=tl.total, script_json=json.dumps(script, ensure_ascii=False),
+                                     facts_json=json.dumps(sheet.to_dict(), ensure_ascii=False),
+                                     metadata_json=json.dumps(meta, ensure_ascii=False),
+                                     prompts_json=json.dumps(pkg, ensure_ascii=False), qc_json="{}")
+        save_package(out_dir, pkg, script, sheet, meta, video_id)
+        self.send_prompt_package(video_id)
+        return video_id
+
+    def send_prompt_package(self, video_id: int) -> None:
+        from html import escape
+        v = self.db.get_video(video_id)
+        run = self.db.one("SELECT output_dir FROM runs WHERE id=?", (v["run_id"],))
+        out_dir = Path(run["output_dir"])
+        if not self.telegram:
+            log.warning("Telegram not configured. Prompts for #%s: %s — then: dva submit <video> --video-id %s",
+                        video_id, out_dir / "PROMPTS.md", video_id)
+            return
+        from .approval.telegram import Telegram
+        tg = self.telegram
+        pkg, meta = json.loads(v["prompts_json"]), json.loads(v["metadata_json"])
+        facts = json.loads(v["facts_json"])
+        n_clips = sum(len(s["clips"]) for s in pkg["scenes"])
+        has_voice = (out_dir / "voiceover.wav").exists()
+        inbox = self.cfg.path("prompt_mode.inbox_dir", "inbox")
+        demo = "🧪 DEMO CONTENT — facts hand-curated, re-check before publishing\n" if facts.get("demo") else ""
+        ids = tg.send_message(
+            f"{demo}🎬 <b>Video #{video_id}: {escape(v['title'] or '')}</b>\n"
+            f"📂 {escape(v['category'] or '')} · ⏱ ~{pkg['total_seconds']:.0f}s · {len(pkg['scenes'])} scenes · "
+            f"{n_clips} clips\n💡 {escape(facts.get('angle', ''))}\n\n"
+            "<b>What to do</b>\n1. Generate the clips below in your AI video tool (each prompt is complete — "
+            "style and character are included).\n2. Join them in order — or send all clips and I'll join them.\n"
+            "3. " + ("Keep it <b>silent</b>: I'll add the Hinglish voiceover, music and subtitles. "
+                     "(Or put <code>voiceover_with_music.wav</code> under it from 0:00.)\n" if has_voice else
+                     "Add your own voiceover using the script below.\n") +
+            f"4. Reply to this chat with the video as a <b>file</b> (≤ 20 MB), or drop it into "
+            f"<code>{escape(str(inbox))}</code>. I'll check it and publish to YouTube + Instagram with captions.",
+            parse_mode="HTML")
+        for s in pkg["scenes"]:
+            head = (f"<b>Scene {s['id']} · {s['seconds']:.1f}s</b>"
+                    + (f" · text: <b>{escape(s['on_screen_text'])}</b>" if s.get("on_screen_text") else "")
+                    + f"\n🗣 <i>{escape(s['voiceover'])}</i>\n")
+            body = ""
+            for c in s["clips"]:
+                block = f"\n<b>Clip {c['clip']} ({c['seconds']:.1f}s)</b>\n<pre>{escape(c['prompt'])}</pre>"
+                if len(head) + len(body) + len(block) > 3900:
+                    ids += tg.send_message(head + body, parse_mode="HTML")
+                    head, body = f"<b>Scene {s['id']} (cont.)</b>\n", ""
+                body += block
+            ids += tg.send_message(head + body, parse_mode="HTML")
+        ids += tg.send_message(f"🚫 <b>Negative prompt</b> (if your tool has one)\n<pre>{escape(pkg['negative_prompt'])}</pre>",
+                               parse_mode="HTML")
+        if len(pkg["single_prompt"]) < 3800:
+            ids += tg.send_message(f"🎞 <b>Single prompt</b> (tools that make long videos)\n"
+                                   f"<pre>{escape(pkg['single_prompt'])}</pre>", parse_mode="HTML")
+        for name, cap in (("PROMPTS.md", "All prompts, script, facts, sources and captions"),
+                          ("voiceover_with_music.wav", "Hinglish voiceover + music (put under the video from 0:00)"),
+                          ("voiceover.wav", "Voice only"), ("subtitles.srt", "Subtitles (timed to the voiceover)")):
+            f = out_dir / name
+            if f.exists():
+                try:
+                    ids.append(tg.send_document(f, cap))
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("could not send %s: %s", name, exc)
+        ids += tg.send_message(
+            f"📝 Captions ready for #{video_id}\nYT: {meta['youtube']['title']}\n\n{meta['instagram']['caption'][:900]}"
+            f"\n\n➡️ Reply to this message with your video (or caption it #{video_id}).",
+            reply_markup=Telegram.prompt_keyboard(video_id))
+        self.db.update_video(video_id, telegram_message_ids=json.dumps(ids))
+
     # ---------------------------------------------------------- approval
     def approval_text(self, video_id: int) -> tuple[str, str]:
         v = self.db.get_video(video_id)
         script, facts, meta, qc = (json.loads(v[k]) for k in ("script_json", "facts_json", "metadata_json", "qc_json"))
         demo = "🧪 DEMO CONTENT — facts hand-curated, re-check before publishing\n" if facts.get("demo") else ""
         warnings = [c for c in qc["checks"] if c["severity"] == "warning"]
+        how = (f"{qc.get('renderer')}, {qc.get('tts')}" if qc.get("renderer")
+               else "your footage: " + "; ".join(qc.get("notes", [])))
         caption = (f"{demo}🎬 #{video_id} {v['title']}\n📂 {facts['category']} · ⏱ {v['duration']}s · "
-                   f"QC ✅ ({qc.get('renderer')}, {qc.get('tts')})\n\n"
+                   f"QC ✅ ({how})\n\n"
                    f"YT: {meta['youtube']['title']}\n\nApprove to publish on YouTube Shorts + Instagram Reels.")
         lines = [f"📝 SCRIPT #{video_id} — {facts['topic']}", ""]
         for s in script["scenes"]:
@@ -229,7 +349,8 @@ class Pipeline:
             return
         from .approval.telegram import Telegram
         ids = self.telegram.send_message(details)
-        mid = self.telegram.send_video(Path(v["video_path"]), caption, Telegram.keyboard(video_id), thumb,
+        keyboard = Telegram.keyboard(video_id, regen=(v["mode"] or "full") != "prompt")
+        mid = self.telegram.send_video(Path(v["video_path"]), caption, keyboard, thumb,
                                        duration=int(v["duration"] or 60))
         self.db.update_video(video_id, telegram_message_ids=json.dumps(ids + [mid]))
 
@@ -241,41 +362,48 @@ class Pipeline:
         if action == "approve":
             if not self.db.transition_video(video_id, ("awaiting_approval",), "approved"):
                 return f"#{video_id} is already '{v['status']}'"
-            from .publish.manager import Publisher
-            results = (self._publisher or Publisher(self.cfg, self.db)).publish(video_id)
-            lines = [f"🚀 Publishing #{video_id}:"]
-            for p, r in results.items():
-                lines.append(f"• {p}: {r.get('status')} {r.get('url') or ''} {r.get('error') or ''}".rstrip())
-                if p == "youtube" and r.get("privacy") == "private" and \
-                        self.cfg.get("publish.youtube.privacy_status") == "public":
-                    lines.append("  ⚠️ YouTube kept it PRIVATE — your API project needs Google's audit (docs/SETUP.md)")
-            if any(r.get("status") != "published" for r in results.values()):
-                lines.append(f"Retry failed platforms with: dva publish {video_id}")
-            return "\n".join(lines)
+            return self.publish_approved(video_id)
         if action == "reject":
-            if not self.db.transition_video(video_id, ("awaiting_approval", "approved"), "rejected"):
+            if not self.db.transition_video(video_id, ("awaiting_approval", "approved", "awaiting_footage"),
+                                            "rejected"):
                 return f"#{video_id} is already '{v['status']}'"
             if v["topic_id"]:
                 self.db.execute("UPDATE topics SET status='blacklisted' WHERE id=?", (v["topic_id"],))
             return f"❌ #{video_id} rejected; topic blacklisted. Send /new for a fresh video."
         if action == "regen":
-            if not self.db.transition_video(video_id, ("awaiting_approval",), "regenerating"):
+            prev = v["status"]
+            if not self.db.transition_video(video_id, ("awaiting_approval", "awaiting_footage"), "regenerating"):
                 return f"#{video_id} is already '{v['status']}'"
-            res = self.run(kind="regenerate", regenerate_of=video_id, force=True)
+            res = self.run(kind="regenerate", regenerate_of=video_id, force=True,
+                           mode="prompt" if prev == "awaiting_footage" else None)
             return f"🔁 Regenerated → {res.get('status')} (video #{res.get('video_id')})"
         return f"unknown action {action}"
 
+    def publish_approved(self, video_id: int) -> str:
+        from .publish.manager import Publisher
+        results = (self._publisher or Publisher(self.cfg, self.db)).publish(video_id)
+        lines = [f"🚀 Publishing #{video_id}:"]
+        for p, r in results.items():
+            lines.append(f"• {p}: {r.get('status')} {r.get('url') or ''} {r.get('error') or ''}".rstrip())
+            if p == "youtube" and r.get("privacy") == "private" and \
+                    self.cfg.get("publish.youtube.privacy_status") == "public":
+                lines.append("  ⚠️ YouTube kept it PRIVATE — your API project needs Google's audit (docs/SETUP.md)")
+        if any(r.get("status") != "published" for r in results.values()):
+            lines.append(f"Retry failed platforms with: dva publish {video_id}")
+        return "\n".join(lines)
+
     # ----------------------------------------------------------------- run
     def run(self, kind: str = "daily", force: bool = False, regenerate_of: int | None = None,
-            demo: bool = False) -> dict:
+            demo: bool = False, mode: str | None = None) -> dict:
+        mode = mode or self.cfg.get("workflow.mode", "prompt")
         with run_lock(self.cfg.data_dir / "run.lock"):
-            return self._run(kind, force, regenerate_of, demo)
+            return self._run(kind, force, regenerate_of, demo, mode)
 
-    def _run(self, kind: str, force: bool, regenerate_of: int | None, demo: bool) -> dict:
+    def _run(self, kind: str, force: bool, regenerate_of: int | None, demo: bool, mode: str = "full") -> dict:
         day = self.today()
         if kind == "daily" and not force:
             done = self.db.one("SELECT id, status FROM runs WHERE run_date=? AND kind='daily' AND status IN "
-                               "('awaiting_approval','done','package')", (day,))
+                               "('awaiting_approval','awaiting_footage','done','package')", (day,))
             if done:
                 log.info("Today's run already finished (run %s, %s) — use --force to run again", done["id"], done["status"])
                 return {"status": "skipped", "run_id": done["id"]}
@@ -318,6 +446,20 @@ class Pipeline:
                 writer = ScriptWriter(self.cfg, self.llm, self.db.kv_get("tts_wps"))
                 script = writer.write(sheet, learnings(self.db))
             (out_dir / "script.json").write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
+            # ---- prompt mode: hand over prompts + voiceover, wait for your footage --------
+            if mode == "prompt":
+                try:
+                    video_id = self.prompt_package(run_id, sheet, script, out_dir, topic_id)
+                except DurationMismatch as dm:
+                    if writer is None:
+                        raise
+                    script = self._rewrite_for_length(writer, sheet, dm, run_id, out_dir)
+                    video_id = self.prompt_package(run_id, sheet, script, out_dir, topic_id)
+                if regenerate_of:
+                    self.db.update_video(regenerate_of, status="superseded")
+                self.db.update_run(run_id, status="awaiting_footage", stage="awaiting_footage")
+                return {"status": "awaiting_footage", "run_id": run_id, "video_id": video_id,
+                        "prompts": str(out_dir / "PROMPTS.md")}
             # ---- production ---------------------------------------------
             seed_base = f"{day}:{sheet.topic}:{run_id}"
             try:
@@ -325,14 +467,7 @@ class Pipeline:
             except DurationMismatch as dm:
                 if writer is None:
                     raise
-                target = float(self.cfg.get("video.target_duration", 60))
-                log.warning("%s — rewriting once for ~%ss", dm, target)
-                self.db.update_run(run_id, stage="script")
-                writer.wps = dm.wps
-                script = writer.write(sheet, f"\nNOTE: your last draft was {dm.seconds:.0f}s when spoken; "
-                                             f"the video must be about {target:.0f}s.\n")
-                (out_dir / "script.json").write_text(json.dumps(script, ensure_ascii=False, indent=2),
-                                                     encoding="utf-8")
+                script = self._rewrite_for_length(writer, sheet, dm, run_id, out_dir)
                 video_id = self.produce(run_id, sheet, script, out_dir, topic_id, seed_base)
             if regenerate_of:
                 self.db.update_video(regenerate_of, status="superseded")
@@ -343,8 +478,20 @@ class Pipeline:
             log.error("run %s failed at stage %s: %s", run_id, self._stage(run_id), exc)
             log.debug(traceback.format_exc())
             if regenerate_of:
-                self.db.transition_video(regenerate_of, ("regenerating",), "awaiting_approval")
+                self.db.transition_video(regenerate_of, ("regenerating",),
+                                         "awaiting_footage" if mode == "prompt" else "awaiting_approval")
             return self._fail(run_id, out_dir, sheet, script, exc)
+
+    def _rewrite_for_length(self, writer, sheet: FactSheet, dm: "DurationMismatch", run_id: int,
+                            out_dir: Path) -> dict:
+        target = float(self.cfg.get("video.target_duration", 60))
+        log.warning("%s — rewriting once for ~%ss", dm, target)
+        self.db.update_run(run_id, stage="script")
+        writer.wps = dm.wps
+        script = writer.write(sheet, f"\nNOTE: your last draft was {dm.seconds:.0f}s when spoken; "
+                                     f"the video must be about {target:.0f}s.\n")
+        (out_dir / "script.json").write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
+        return script
 
     def _stage(self, run_id: int) -> str:
         r = self.db.one("SELECT stage FROM runs WHERE id=?", (run_id,))

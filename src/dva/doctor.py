@@ -12,12 +12,20 @@ def doctor(pipe) -> int:
     def add(name, ok, detail=""):
         rows.append((name, bool(ok), detail))
 
+    mode = cfg.get("workflow.mode", "prompt")
+    inbox = cfg.path("prompt_mode.inbox_dir", "inbox").expanduser()
+    add("mode", True, f"{mode} — " + ("you generate the video from daily prompts" if mode == "prompt"
+                                       else "Blender renders the video here"))
+    if mode == "prompt":
+        add("inbox", True, str(inbox))
     ff = shutil.which("ffmpeg")
     ver = subprocess.run(["ffmpeg", "-version"], capture_output=True, text=True).stdout.split("\n")[0] if ff else ""
     add("ffmpeg", ff, ver)
     from .render.runner import BlenderRenderer
     br = BlenderRenderer(cfg)
-    add("blender", br.available(), " ".join(br.cmd or []) or "not found — fallback renderer will be used")
+    add("blender", br.available() or mode == "prompt",
+        " ".join(br.cmd or []) or ("not needed in prompt mode" if mode == "prompt"
+                                   else "not found — fallback renderer will be used"))
     from .tts.engines import ENGINES
     for name in cfg.get("tts.engine_order", []):
         eng = ENGINES[name](cfg.section(f"tts.{name}"), cfg.root)

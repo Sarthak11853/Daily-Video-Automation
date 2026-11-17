@@ -119,3 +119,45 @@ def summarize(report: dict) -> str:
     bad = [c for c in report["checks"] if not c["ok"]]
     head = f"QC {'PASSED' if report['passed'] else 'FAILED'} — {report.get('duration')}s, {report.get('size_mb')} MB"
     return head + "".join(f"\n  ✗ {c['name']}: {c['detail']}" for c in bad)
+
+
+def footage_qc(video: Path, cfg, cues: list[dict] | None = None, sheet: FactSheet | None = None,
+               script: dict | None = None) -> dict:
+    """QC for a video you generated yourself (prompt mode)."""
+    v, pm, q = cfg.section("video"), cfg.section("prompt_mode"), cfg.section("qc")
+    checks: list[dict] = []
+
+    def add(name: str, ok: bool, detail: str = "", severity: str = "error"):
+        checks.append({"name": name, "ok": bool(ok), "detail": detail, "severity": severity})
+
+    info = ffprobe(video)
+    vs = next((s for s in info["streams"] if s["codec_type"] == "video"), None)
+    au = next((s for s in info["streams"] if s["codec_type"] == "audio"), None)
+    dur = float(info["format"].get("duration", 0))
+    size_mb = int(info["format"].get("size", 0)) / 1e6
+    add("video_stream", vs is not None)
+    add("audio_stream", au is not None)
+    if vs:
+        add("resolution", (vs["width"], vs["height"]) == (v.get("width", 1080), v.get("height", 1920)),
+            f"{vs['width']}x{vs['height']}")
+        add("codec", vs.get("codec_name") == "h264" and vs.get("pix_fmt") == "yuv420p",
+            f"{vs.get('codec_name')} {vs.get('pix_fmt')}")
+    add("duration", float(pm.get("min_duration", 10)) <= dur <= float(pm.get("max_duration", 180)), f"{dur:.2f}s")
+    add("file_size", size_mb <= 280, f"{size_mb:.1f} MB (Instagram API limit ~300 MB)")
+    add("telegram_preview_size", size_mb <= float(v.get("max_file_mb", 49)), f"{size_mb:.1f} MB", severity="warning")
+    err = integrity_errors(video)
+    add("decode_integrity", not err, err[:300])
+    blacks = [b for b in _detect(video, "blackdetect=d=0.2:pix_th=0.08", "video")
+              if b[1] > max(1.0, float(q.get("max_black_seconds", 0.6)))]
+    add("no_black_frames", not blacks, f"{blacks[:3]}")
+    silences = [s for s in _detect(video, "silencedetect=noise=-45dB:d=0.5", "audio")
+                if s[1] > float(q.get("max_silence_seconds", 2.0)) * 2]
+    add("no_long_silence", not silences, f"{silences[:3]}", severity="warning")
+    if cues:
+        add("subtitles_within_video", all(c["end"] <= dur + 0.3 for c in cues), "")
+    if sheet is not None and script is not None:
+        verified = {c.id for c in sheet.verified_claims}
+        used = {cid for s in script["scenes"] for cid in s.get("claim_ids", [])}
+        add("facts_verified", used <= verified and bool(used), f"{len(used)} verified claims in the script")
+    passed = all(c["ok"] for c in checks if c["severity"] == "error")
+    return {"passed": passed, "duration": round(dur, 2), "size_mb": round(size_mb, 1), "checks": checks}

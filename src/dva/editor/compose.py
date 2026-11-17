@@ -36,8 +36,10 @@ def ff(args: list[str]) -> None:
         raise RuntimeError(f"ffmpeg failed: {r.stderr[-2000:]}")
 
 
-def build_audio(tl: Timeline, voice: list[dict], scenes: list[dict], cfg, work: Path, seed: int) -> Path:
+def build_audio(tl: Timeline, voice: list[dict], scenes: list[dict], cfg, work: Path, seed: int,
+                sfx_enabled: bool | None = None, out_name: str = "mix.wav", music_on: bool = True) -> Path:
     """Voice timeline + ducked music + SFX -> loudness-normalised stereo WAV."""
+    use_sfx = cfg.get("audio.sfx", True) if sfx_enabled is None else sfx_enabled
     n = int((tl.total + 0.5) * SR)
     vo = np.zeros(n)
     fx = np.zeros(n)
@@ -45,7 +47,7 @@ def build_audio(tl: Timeline, voice: list[dict], scenes: list[dict], cfg, work: 
         a = read_wav(Path(v["wav"]))
         s = int(st.voice_start * SR)
         vo[s:s + len(a)] += a[: max(0, n - s)]
-        if cfg.get("audio.sfx", True):
+        if use_sfx:
             kind = sc.get("sfx", "whoosh")
             if st.id == scenes[0]["id"] and kind == "whoosh":
                 kind = "boom"
@@ -62,9 +64,9 @@ def build_audio(tl: Timeline, voice: list[dict], scenes: list[dict], cfg, work: 
         ff(["-stream_loop", "-1", "-i", str(src), "-t", f"{tl.total + 0.5:.2f}", "-ar", str(SR), "-ac", "2", str(mus_p)])
     else:
         write_wav(mus_p, music(tl.total + 0.5, seed))
-    mvol = float(cfg.get("audio.music_volume_db", -20))
+    mvol = float(cfg.get("audio.music_volume_db", -20)) if music_on else -120.0
     lufs = float(cfg.get("audio.target_lufs", -14))
-    out = work / "mix.wav"
+    out = work / out_name
     graph = (f"[2:a]volume={mvol}dB,afade=t=out:st={max(0, tl.total - 1.5):.2f}:d=1.5[m];"
              "[0:a]asplit=2[v][vk];"
              "[m][vk]sidechaincompress=threshold=0.03:ratio=6:attack=15:release=350[md];"
@@ -120,4 +122,39 @@ def compose(clips: list[Path], tl: Timeline, audio: Path, ass: Path, cfg, out: P
 
 def thumbnail(video: Path, at: float, out: Path) -> Path:
     ff(["-ss", f"{at:.2f}", "-i", str(video), "-frames:v", "1", "-q:v", "3", str(out)])
+    return out
+
+
+def overlay(video: Path, total: float, cfg, out: Path, audio: Path | None = None, ass: Path | None = None,
+            stretch: float = 1.0, loop: bool = False, branding: bool = True) -> Path:
+    """Finish a user-supplied (already 1080x1920) video: optional time-stretch/loop to `total` seconds,
+    burned-in subtitles, progress bar, watermark, and an optional replacement audio track."""
+    fps = int(cfg.get("video.fps", 30))
+    vf = []
+    if abs(stretch - 1.0) > 1e-3:
+        vf.append(f"setpts=PTS*{stretch:.5f}")
+    if ass is not None:
+        fonts_dir = cfg.path("subtitles.fonts_dir", "assets/fonts")
+        f = f"ass='{_ff_escape(str(ass))}'"
+        if fonts_dir.is_dir():
+            f += f":fontsdir='{_ff_escape(str(fonts_dir))}'"
+        vf.append(f)
+    if branding and cfg.get("video.progress_bar", True):
+        vf.append(f"drawbox=x=0:y=ih-14:w='iw*t/{total:.3f}':h=14:color=0xFFD21F@0.9:t=fill")
+    font = find_font(cfg)
+    if branding and cfg.get("video.watermark", True) and font:
+        handle = str(cfg.get("channel.handle", "")).replace(":", "\\:").replace("'", "")
+        vf.append(f"drawtext=fontfile='{_ff_escape(font)}':text='{handle}':x=40:y=60:fontsize=38:"
+                  "fontcolor=white@0.75:borderw=3:bordercolor=black@0.5")
+    vf.append(f"fps={fps},format=yuv420p")
+    args = (["-stream_loop", "-1"] if loop else []) + ["-i", str(video)]
+    if audio is not None:
+        args += ["-i", str(audio), "-map", "0:v:0", "-map", "1:a:0"]
+    else:
+        args += ["-map", "0:v:0", "-map", "0:a:0?"]
+    args += ["-vf", ",".join(vf), "-c:v", "libx264", "-preset", "slow", "-profile:v", "high", "-level", "4.2",
+             "-crf", str(cfg.get("video.crf", 20)), "-maxrate", str(cfg.get("video.maxrate", "5M")), "-bufsize", "10M",
+             "-g", str(fps * 2), "-c:a", "aac", "-b:a", str(cfg.get("video.audio_bitrate", "192k")), "-ar", str(SR),
+             "-ac", "2", "-movflags", "+faststart", "-t", f"{total:.3f}", str(out)]
+    ff(args)
     return out

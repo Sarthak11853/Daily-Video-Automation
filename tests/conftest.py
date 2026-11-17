@@ -102,6 +102,13 @@ class FakeProvider(LLMProvider):
             if self.audit_fail_first and self.calls.count("audit") == 1:
                 return json.dumps({"assertions": [{"scene": 2, "text": "made up", "supported": False}]})
             return json.dumps({"assertions": [{"scene": 1, "text": "x", "supported": True}]})
+        if "Return exactly" in prompt and "text-to-video" in system:
+            self.calls.append("video_prompts")
+            import re
+            ids = [int(x) for x in re.findall(r"^(\d+)\. \(", prompt, re.M)]
+            return json.dumps({"scenes": [{"id": i, "shot": f"A tiny tardigrade floats in space, shot {i}.",
+                                           "camera": "slow dolly in", "transition_hint": "fade"} for i in ids],
+                               "thumbnail_prompt": "tardigrade in space", "music_mood": "curious upbeat"})
         if "Write a ~" in prompt:
             self.calls.append("script")
             return json.dumps(self.script)
@@ -130,9 +137,15 @@ class FakeTelegram:
     def __init__(self):
         self.sent: list[tuple] = []
 
-    def send_message(self, text, reply_markup=None, chat_id=None):
-        self.sent.append(("msg", text))
+    def send_message(self, text, reply_markup=None, chat_id=None, parse_mode=None, reply_to=None):
+        self.sent.append(("msg", text, reply_markup, parse_mode))
         return [len(self.sent)]
+
+    def download(self, file_id, dest):
+        import shutil
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(file_id, dest)  # tests pass a local path as the file_id
+        return dest
 
     def send_video(self, path, caption, reply_markup=None, thumb=None, **kw):
         self.sent.append(("video", str(path), caption, reply_markup))
@@ -174,6 +187,8 @@ def cfg(tmp_path) -> Config:
         "research": {"min_verified_claims": 4},
         "approval": {"telegram": {"bot_token_env": "NOPE_TOKEN", "chat_id_env": "NOPE_CHAT"}},
         "llm": {"gemini": {"min_seconds_between_calls": 0}},
+        "workflow": {"mode": "full"},
+        "prompt_mode": {"inbox_dir": str(tmp_path / "inbox"), "min_duration": 3},
     }
     return Config.load(ROOT / "config" / "settings.yaml", root=ROOT, overrides=overrides)
 

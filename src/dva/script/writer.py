@@ -35,6 +35,8 @@ For every scene provide:
 - "narration_display": Hinglish in ROMAN script (for subtitles), short punchy sentences.
 - "narration_tts": the SAME sentence in DEVANAGARI script for a Hindi text-to-speech voice. Write English words
    phonetically in Devanagari (e.g. "साइंटिस्ट्स", "ब्लड"), write numbers as Hindi words.
+- "visual_description": 1-2 English sentences describing what the viewer SEES in this shot (subject, setting,
+   action, mood) — vivid and cinematic, faithful to the facts, no on-screen text.
 - "claim_ids": ids of the verified facts this scene states (empty list only if it states no fact).
 - "environment": one of {envs}
 - "props": 1-3 items from {props}
@@ -96,6 +98,7 @@ def normalize_script(data: dict, cfg) -> dict:
             "camera": closest(s.get("camera"), CAMERA_MOVES, "push_in"),
             "on_screen_text": ost,
             "sfx": s.get("sfx") if s.get("sfx") in SFX else "whoosh",
+            "visual_description": " ".join(str(s.get("visual_description", "")).split())[:600],
         })
     tags = []
     for h in data.get("hashtags") or []:

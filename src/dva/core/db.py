@@ -45,7 +45,8 @@ CREATE TABLE IF NOT EXISTS videos (
     topic_id INTEGER,
     title TEXT,
     category TEXT,
-    status TEXT NOT NULL,     -- awaiting_approval | approved | rejected | regenerating | publishing | published | package | failed
+    status TEXT NOT NULL,     -- awaiting_footage | processing_footage | awaiting_approval | approved | rejected |
+                              -- regenerating | publishing | published | skipped | superseded
     video_path TEXT,
     video_sha256 TEXT UNIQUE,
     duration REAL,
@@ -111,6 +112,15 @@ class Database:
         self.conn = sqlite3.connect(self.path, check_same_thread=False, timeout=30)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        """Add columns introduced after the first release (idempotent)."""
+        cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(videos)")}
+        for name, decl in (("prompts_json", "TEXT"), ("footage_path", "TEXT"), ("mode", "TEXT DEFAULT 'full'")):
+            if name not in cols:
+                self.conn.execute(f"ALTER TABLE videos ADD COLUMN {name} {decl}")
+        self.conn.commit()
 
     @contextmanager
     def tx(self) -> Iterator[sqlite3.Connection]:
@@ -174,7 +184,7 @@ class Database:
                             (run_date, kind, "running", "start", utcnow()))
 
     def update_run(self, run_id: int, **fields: Any) -> None:
-        if fields.get("status") in ("awaiting_approval", "package", "failed", "done"):
+        if fields.get("status") in ("awaiting_approval", "awaiting_footage", "package", "failed", "done"):
             fields.setdefault("finished_at", utcnow())
         cols = ", ".join(f"{k}=?" for k in fields)
         self.execute(f"UPDATE runs SET {cols} WHERE id=?", (*fields.values(), run_id))
