@@ -55,8 +55,11 @@ def test_daily_run_to_publish(cfg, db):
 def test_failure_produces_package(cfg, db):
     cfg.data["video"]["max_duration"] = 5  # force QC/duration failure after script stage
     tg = FakeTelegram()
-    res = _pipe(cfg, db, tg).run()
+    pipe = _pipe(cfg, db, tg)
+    res = pipe.run()
     assert res["status"] == "package"
+    assert pipe.llm.providers[0].calls.count("script") >= 2  # automatic rewrite for length was attempted
+    assert db.kv_get("tts_wps") > 0
     assert Path(res["package"]).exists()
     assert any(s[0] == "doc" for s in tg.sent)
 

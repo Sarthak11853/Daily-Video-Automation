@@ -104,7 +104,7 @@ class Discovery:
         if not self.cfg.get("topics.wikipedia_featured.enabled", True):
             return []
         day = day or date.today()
-        url = f"https://api.wikimedia.org/feed/v1/wikipedia/en/featured/{day:%Y/%m/%d}"
+        url = f"https://en.wikipedia.org/api/rest_v1/feed/featured/{day:%Y/%m/%d}"
         data = self.http.get(url).json()
         out: list[Candidate] = []
         for art in (data.get("mostread", {}) or {}).get("articles", [])[:25]:

@@ -113,7 +113,7 @@ def normalize_script(data: dict, cfg) -> dict:
     }
 
 
-def validate_script(script: dict, sheet: FactSheet, cfg) -> list[str]:
+def validate_script(script: dict, sheet: FactSheet, cfg, word_range: tuple[int, int] | None = None) -> list[str]:
     """Return a list of problems (empty = valid)."""
     problems: list[str] = []
     scenes = script.get("scenes", [])
@@ -121,7 +121,7 @@ def validate_script(script: dict, sheet: FactSheet, cfg) -> list[str]:
     if not lo <= len(scenes) <= hi:
         problems.append(f"need {lo}-{hi} scenes, got {len(scenes)}")
     words = sum(len(s["narration_display"].split()) for s in scenes)
-    wmin, wmax = int(cfg.get("script.min_words", 120)), int(cfg.get("script.max_words", 175))
+    wmin, wmax = word_range or (int(cfg.get("script.min_words", 120)), int(cfg.get("script.max_words", 175)))
     if not wmin <= words <= wmax:
         problems.append(f"total words {words} outside {wmin}-{wmax}")
     if scenes and len(scenes[0]["narration_display"].split()) > 14:
@@ -147,9 +147,20 @@ def validate_script(script: dict, sheet: FactSheet, cfg) -> list[str]:
 
 
 class ScriptWriter:
-    def __init__(self, cfg, llm: LLMChain):
+    def __init__(self, cfg, llm: LLMChain, wps: float | None = None):
         self.cfg = cfg
         self.llm = llm
+        self.wps = wps  # measured TTS words/second (None = use configured word range)
+
+    def word_range(self, n_scenes: int = 8) -> tuple[int, int]:
+        lo, hi = int(self.cfg.get("script.min_words", 120)), int(self.cfg.get("script.max_words", 175))
+        if not self.wps:
+            return lo, hi
+        # spoken seconds available = target minus per-scene gaps/transitions and the outro tail
+        overhead = n_scenes * 0.82 + 1.2
+        target = float(self.cfg.get("video.target_duration", 60))
+        mid = (target - overhead) * self.wps
+        return max(40, int(mid * 0.9)), int(mid * 1.08)
 
     def _prompt(self, sheet: FactSheet, feedback: str, learnings: str) -> tuple[str, str]:
         c = self.cfg
@@ -157,8 +168,8 @@ class ScriptWriter:
         prompt = PROMPT.format(
             claims=_fmt_claims(sheet), topic=sheet.topic, angle=sheet.angle, learnings=learnings,
             seconds=c.get("video.target_duration", 60), min_scenes=c.get("video.min_scenes", 6),
-            max_scenes=c.get("video.max_scenes", 10), min_words=c.get("script.min_words", 120),
-            max_words=c.get("script.max_words", 175), envs=json.dumps(list(ENVIRONMENTS)),
+            max_scenes=c.get("video.max_scenes", 10), min_words=self.word_range()[0],
+            max_words=self.word_range()[1], envs=json.dumps(list(ENVIRONMENTS)),
             props=json.dumps(list(PROPS)), actions=json.dumps(list(MASCOT_ACTIONS)),
             cameras=json.dumps(list(CAMERA_MOVES)), sfx=json.dumps(SFX),
             feedback=f"\nYOUR PREVIOUS DRAFT HAD THESE PROBLEMS — FIX THEM:\n{feedback}" if feedback else "")
@@ -178,7 +189,7 @@ class ScriptWriter:
             system, prompt = self._prompt(sheet, feedback, learnings)
             raw = self.llm.json(prompt, system=system, temperature=float(self.cfg.get("llm.temperature", 0.8)))
             script = normalize_script(raw if isinstance(raw, dict) else {}, self.cfg)
-            problems = validate_script(script, sheet, self.cfg)
+            problems = validate_script(script, sheet, self.cfg, self.word_range(len(script["scenes"]) or 8))
             if not problems:
                 problems = self.audit(script, sheet)
             if not problems:

@@ -231,6 +231,8 @@ def sec(t):
 
 
 def pop_in(obj, start, final_scale=None, dur=0.45):
+    if STATE.get("fast_intro"):  # first scene = the hook: everything on screen within ~0.15 s
+        start, dur = start * 0.15, min(dur, 0.16)
     s = tuple(final_scale or obj.scale)
     key(obj, "scale", sec(start), (0.001, 0.001, 0.001), "BACK")
     key(obj, "scale", sec(start + dur), s)
@@ -1114,6 +1116,7 @@ def build(spec):
     else:
         STATE["font"] = None
     scene = spec["scene"]
+    STATE["fast_intro"] = int(scene.get("id", 0)) == 1
     env = scene.get("environment", "studio")
     has_ground = build_environment(env, r)
 

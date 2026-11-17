@@ -22,6 +22,15 @@ from zoneinfo import ZoneInfo
 from .core.config import Config
 from .core.db import Database
 from .core.errors import ConfigError, QCFailed, VerificationFailed
+
+
+class DurationMismatch(QCFailed):
+    """The voiced script is too short/long; carries the measured length for a rewrite."""
+
+    def __init__(self, seconds: float, wps: float):
+        super().__init__(f"voiced narration gives a {seconds:.1f}s video")
+        self.seconds = seconds
+        self.wps = wps
 from .core.models import FactSheet
 from .core.text import keywords, normalize
 
@@ -149,8 +158,13 @@ class Pipeline:
         tl = build_timeline(script["scenes"], voice, float(v.get("transition_seconds", 0.35)),
                             pad=float(v.get("scene_padding_seconds", 0.35)))
         (out_dir / "timeline.json").write_text(json.dumps(tl.to_dict(), ensure_ascii=False, indent=2))
-        if tl.total > float(v.get("max_duration", 75)):
-            raise QCFailed(f"narration too long ({tl.total:.1f}s) — script must be shortened", {})
+        # calibrate the TTS speaking rate (words/sec) so future scripts hit the target length
+        words = sum(len(s["narration_display"].split()) for s in script["scenes"])
+        wps = words / max(0.1, sum(x["duration"] for x in voice))
+        old = self.db.kv_get("tts_wps")
+        self.db.kv_set("tts_wps", round(wps if old is None else 0.7 * old + 0.3 * wps, 3))
+        if not float(v.get("min_duration", 45)) <= tl.total <= float(v.get("max_duration", 75)):
+            raise DurationMismatch(tl.total, wps)
         self.db.update_run(run_id, stage="render")
         clips, renderer = render_video_scenes(self.cfg, script["scenes"], [s.clip_len for s in tl.scenes],
                                               out_dir / "render", seed_base)
@@ -296,15 +310,30 @@ class Pipeline:
                                              sheet.category, cand_source, cand_url, wiki, status="used")
             self.db.update_run(run_id, topic_id=topic_id)
             # ---- script --------------------------------------------------
+            writer = None
             if script is None:
                 self.db.update_run(run_id, stage="script")
                 from .analytics.collector import learnings
                 from .script.writer import ScriptWriter
-                script = ScriptWriter(self.cfg, self.llm).write(sheet, learnings(self.db))
+                writer = ScriptWriter(self.cfg, self.llm, self.db.kv_get("tts_wps"))
+                script = writer.write(sheet, learnings(self.db))
             (out_dir / "script.json").write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
             # ---- production ---------------------------------------------
             seed_base = f"{day}:{sheet.topic}:{run_id}"
-            video_id = self.produce(run_id, sheet, script, out_dir, topic_id, seed_base)
+            try:
+                video_id = self.produce(run_id, sheet, script, out_dir, topic_id, seed_base)
+            except DurationMismatch as dm:
+                if writer is None:
+                    raise
+                target = float(self.cfg.get("video.target_duration", 60))
+                log.warning("%s — rewriting once for ~%ss", dm, target)
+                self.db.update_run(run_id, stage="script")
+                writer.wps = dm.wps
+                script = writer.write(sheet, f"\nNOTE: your last draft was {dm.seconds:.0f}s when spoken; "
+                                             f"the video must be about {target:.0f}s.\n")
+                (out_dir / "script.json").write_text(json.dumps(script, ensure_ascii=False, indent=2),
+                                                     encoding="utf-8")
+                video_id = self.produce(run_id, sheet, script, out_dir, topic_id, seed_base)
             if regenerate_of:
                 self.db.update_video(regenerate_of, status="superseded")
             self.db.update_run(run_id, status="awaiting_approval", stage="approval")

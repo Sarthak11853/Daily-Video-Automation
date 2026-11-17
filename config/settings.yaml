@@ -63,6 +63,7 @@ topics:
 
 research:
   min_verified_claims: 5
+  max_topic_attempts: 4           # candidates researched before giving up for the day
   min_independent_sources: 2      # for the core claim
   allow_single_tier1_source: true # NASA/ESA/Nature/etc. alone may verify a claim
   max_source_chars: 12000
