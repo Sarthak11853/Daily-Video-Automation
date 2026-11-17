@@ -119,6 +119,15 @@ class Instagram:
                              params={"fields": "permalink", "access_token": self.token()}).json()
         return {"id": data["id"], "url": link.get("permalink")}
 
+    def find_recent(self, caption: str, limit: int = 15) -> dict | None:
+        """Safety net against duplicates: a recent post with exactly this caption."""
+        resp = self.http.get(f"{self.base}/{self.user_id()}/media", ok_status=(), params={
+            "fields": "id,caption,permalink,timestamp", "limit": limit, "access_token": self.token()})
+        for m in resp.json().get("data", []) or []:
+            if (m.get("caption") or "").strip() == caption.strip():
+                return {"id": m["id"], "url": m.get("permalink")}
+        return None
+
     def insights(self, media_id: str) -> dict:
         out: dict = {}
         for metric in INSIGHT_METRICS:  # one by one: unsupported metrics must not break the rest

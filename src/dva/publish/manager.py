@@ -78,6 +78,18 @@ class Publisher:
         if pub["status"] == "uploading" and not pub["upload_session"]:
             self.db.update_publication(pub["id"], status="unknown")
             raise DuplicateUpload("youtube: crashed before the upload session was stored")
+        finder = getattr(self.yt, "find_recent", None)
+        if finder and not pub["upload_session"]:
+            try:
+                existing = finder(meta["title"])
+            except Exception as exc:  # noqa: BLE001 — the check is best-effort
+                log.warning("YouTube duplicate check failed: %s", exc)
+                existing = None
+            if existing:
+                url = f"https://www.youtube.com/shorts/{existing}"
+                self.db.update_publication(pub["id"], status="published", external_id=existing, url=url,
+                                           published_at=utcnow())
+                return {"status": "published", "id": existing, "url": url, "note": "already on the channel"}
         self.db.update_publication(pub["id"], status="uploading")
         try:
             res = self.yt.upload(path, meta, session=pub["upload_session"],
@@ -105,6 +117,17 @@ class Publisher:
         if pub["status"] == "publishing_container":
             self.db.update_publication(pub["id"], status="unknown")
             raise DuplicateUpload("instagram: crashed during media_publish; verify on the profile")
+        finder = getattr(self.ig, "find_recent", None)
+        if finder and pub["status"] in ("failed", "pending"):
+            try:
+                existing = finder(meta["caption"])
+            except Exception as exc:  # noqa: BLE001
+                log.warning("Instagram duplicate check failed: %s", exc)
+                existing = None
+            if existing:
+                self.db.update_publication(pub["id"], status="published", external_id=existing["id"],
+                                           url=existing.get("url"), published_at=utcnow())
+                return {"status": "published", **existing, "note": "already on the profile"}
         if not container or pub["status"] in ("failed", "pending"):
             container, uri = self.ig.create_container(meta["caption"])
             self.db.update_publication(pub["id"], status="uploading", upload_session=container)

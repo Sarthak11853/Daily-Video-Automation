@@ -31,7 +31,9 @@ auto subtitles, watermark, a preview before publishing) are in `prompt_mode` in 
 mascot *Gyaanu*), voices it with Piper, edits it with FFmpeg and sends it for **Approve / Regenerate /
 Reject** before publishing.
 
-Both modes run **locally on your Mac** with free and open-source tools. No paid APIs, no hosting.
+Both modes use free and open-source tools only. No paid APIs, no hosting. Run it on your Mac,
+or in **cloud mode** on free GitHub Actions so your Mac can stay off and you only need your phone:
+see **[docs/CLOUD.md](docs/CLOUD.md)**.
 
 ```
  n8n / launchd (09:00 IST)
@@ -109,6 +111,7 @@ Then add credentials (all free) — step by step in **[docs/SETUP.md](docs/SETUP
 | `dva mark-published <id> <platform> <url>` / `dva reset-publication <id> <platform>` | resolve an ambiguous upload by hand |
 | `dva metrics` / `dva report` | collect and print performance |
 | `dva auth-youtube` | one-time YouTube OAuth consent |
+| `dva poll [--check]` | cloud mode: one pass, then exit (what GitHub Actions runs) |
 | `dva doctor` | health check: tools, voices, fonts, credentials, today's LLM quota use |
 | `dva cleanup --days 14` | delete heavy intermediates of old runs |
 
@@ -140,6 +143,8 @@ src/dva/approval/         Telegram client + bot
 src/dva/publish/          metadata, YouTube, Instagram, duplicate-safe publisher
 src/dva/analytics/        metrics collection + learnings
 n8n/                      importable n8n workflow (09:00 IST, metrics every 6 h, weekly cleanup)
+.github/workflows/dva.yml cloud mode: GitHub Actions runner (every ~10 min), encrypted state branch
+src/dva/cloud.py          cloud mode: one stateless pass (Telegram, Drive inbox, daily topic, metrics)
 launchd/                  macOS services (bot, n8n, or n8n-free daily job)
 tests/                    offline test-suite incl. a full end-to-end run with fakes
 ```

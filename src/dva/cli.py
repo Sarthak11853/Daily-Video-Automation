@@ -44,6 +44,8 @@ def main(argv: list[str] | None = None) -> int:
     cp.add_argument("--file", default=None, help="read the caption from a text file")
     cp.add_argument("--suggested", action="store_true", help="publish with the system's suggested caption")
     sub.add_parser("watch", help="watch the inbox folder (use when Telegram isn't set up)")
+    pl = sub.add_parser("poll", help="cloud mode: one pass (Telegram, Drive inbox, daily topic, metrics), then exit")
+    pl.add_argument("--check", action="store_true", help="only report whether there is work (for GitHub Actions)")
     sub.add_parser("bot", help="run the Telegram approval listener (long-running)")
     for name in ("approve", "reject", "regen"):
         p = sub.add_parser(name, help=f"{name} a video manually (same as the Telegram button)")
@@ -97,6 +99,15 @@ def main(argv: list[str] | None = None) -> int:
             ApprovalBot(pipe).loop()
         else:
             watch_loop(pipe)
+    elif args.cmd == "poll":
+        import os
+        from .cloud import poll
+        work = poll(pipe, check_only=args.check)
+        print(json.dumps(work))
+        out = os.environ.get("GITHUB_OUTPUT")
+        if out:
+            with open(out, "a") as fh:
+                fh.write(f"work={'true' if work['any'] else 'false'}\n")
     elif args.cmd == "watch":
         from .approval.bot import watch_loop
         watch_loop(pipe)

@@ -20,6 +20,15 @@ workflow:
   # "full":             the system renders the whole 3D video itself with Blender.
   mode: prompt
 
+cloud:
+  # Runs on GitHub Actions (free for public repos) so your Mac can stay off. Turned on automatically
+  # inside the workflow (DVA__CLOUD__ENABLED=true). See docs/CLOUD.md.
+  enabled: false
+  drive_folder_id_env: DVA_DRIVE_FOLDER_ID   # Google Drive folder for videos > 20 MB (from your phone)
+  drive_folder_name: "DVA Inbox"
+  daily_attempts: 2                          # retries of the daily topic if the first attempt fails
+  metrics_every_hours: 6
+
 prompt_mode:
   inbox_dir: "inbox"               # drop finished videos here; tip: point it at an iCloud Drive folder
                                    # (e.g. "~/Library/Mobile Documents/com~apple~CloudDocs/DVA Inbox")

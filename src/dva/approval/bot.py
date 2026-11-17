@@ -98,11 +98,10 @@ class ApprovalBot:
         if target is None:
             self.tg.send_message("No video is waiting for footage right now. Send /new to get today's prompts.")
             return
-        inbox = self.p.cfg.path("prompt_mode.inbox_dir", "inbox").expanduser()
         if (media.get("file_size") or 0) > TELEGRAM_DOWNLOAD_LIMIT:
             self.tg.send_message(
                 f"This file is {media['file_size'] / 1e6:.0f} MB. Telegram bots can only download files up to 20 MB.\n"
-                f"Drop it into the inbox folder instead (name it {target['id']}.mp4):\n{inbox}")
+                + self.p.big_file_hint(target["id"]))
             return
         if self.busy:
             self.tg.send_message("I'm busy with another job; I'll process this right after.")
@@ -217,6 +216,12 @@ class ApprovalBot:
             self.tg.send_message(f"⏰ Reminder: #{r['id']} “{r['title']}” {what}. Send /pending to see it again.")
             self.db.update_video(r["id"], reminded_at=utcnow())
 
+    def handle_update(self, u: dict) -> None:
+        if "callback_query" in u:
+            self.handle_callback(u["callback_query"])
+        elif "message" in u:
+            self.handle_message(u["message"])
+
     def loop(self) -> None:
         offset = self.db.kv_get("telegram_offset")
         timeout = int(self.p.cfg.get("approval.telegram.poll_timeout", 50))
@@ -228,10 +233,7 @@ class ApprovalBot:
                 for u in updates:
                     offset = u["update_id"] + 1
                     self.db.kv_set("telegram_offset", offset)   # persist first: never process an update twice
-                    if "callback_query" in u:
-                        self.handle_callback(u["callback_query"])
-                    elif "message" in u:
-                        self.handle_message(u["message"])
+                    self.handle_update(u)
                 if time.time() - last_inbox > 30:
                     self.poll_inbox()
                     last_inbox = time.time()

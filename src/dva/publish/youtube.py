@@ -31,7 +31,8 @@ API = "https://www.googleapis.com/youtube/v3"
 ANALYTICS = "https://youtubeanalytics.googleapis.com/v2/reports"
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload",
           "https://www.googleapis.com/auth/youtube.readonly",
-          "https://www.googleapis.com/auth/yt-analytics.readonly"]
+          "https://www.googleapis.com/auth/yt-analytics.readonly",
+          "https://www.googleapis.com/auth/drive.readonly"]   # cloud mode: read videos from your Drive inbox
 
 
 def _write_secret(path: Path, data: dict) -> None:
@@ -185,6 +186,30 @@ class YouTube:
                 log.warning("YouTube upload interrupted (%s); resuming in %ss", exc, wait)
                 time.sleep(wait)
         raise PublishError("YouTube upload did not complete after retries")
+
+    def find_recent(self, title: str, hours: float = 72) -> str | None:
+        """Safety net against duplicates: id of a recent upload on the channel with exactly this title."""
+        ch = self.http.get(f"{API}/channels", params={"part": "contentDetails", "mine": "true"}, headers=self._h())
+        items = ch.json().get("items") or []
+        if not items:
+            return None
+        uploads = items[0]["contentDetails"]["relatedPlaylists"]["uploads"]
+        pl = self.http.get(f"{API}/playlistItems", headers=self._h(), ok_status=(),
+                           params={"part": "snippet", "playlistId": uploads, "maxResults": 15})
+        if pl.status_code != 200:
+            return None
+        cutoff = time.time() - hours * 3600
+        for it in pl.json().get("items", []):
+            sn = it.get("snippet", {})
+            ts = sn.get("publishedAt", "")
+            try:
+                from datetime import datetime
+                when = datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
+            except ValueError:
+                when = time.time()
+            if sn.get("title", "").strip() == title.strip() and when >= cutoff:
+                return sn.get("resourceId", {}).get("videoId")
+        return None
 
     # ---------------------------------------------------------- metrics
     def stats(self, video_ids: list[str]) -> dict[str, dict]:

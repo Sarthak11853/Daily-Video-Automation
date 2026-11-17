@@ -256,6 +256,16 @@ class Pipeline:
         self.send_prompt_package(video_id)
         return video_id
 
+    def big_file_hint(self, video_id: int | None = None) -> str:
+        """Where to send videos bigger than Telegram's 20 MB bot limit."""
+        if self.cfg.get("cloud.enabled", False) or self.cfg.secret(self.cfg.get("cloud.drive_folder_id_env",
+                                                                                 "DVA_DRIVE_FOLDER_ID")):
+            name = f"{video_id}.mp4" if video_id else "the video"
+            return (f"Upload it to your Google Drive folder “{self.cfg.get('cloud.drive_folder_name', 'DVA Inbox')}” "
+                    f"instead (e.g. as {name}) and send the caption here as a text message.")
+        inbox = self.cfg.path("prompt_mode.inbox_dir", "inbox")
+        return f"Drop it into the inbox folder instead (name it {video_id}.mp4): {inbox}"
+
     def send_prompt_package(self, video_id: int) -> None:
         from html import escape
         v = self.db.get_video(video_id)
@@ -285,8 +295,7 @@ class Pipeline:
             "with style and character included).\n2. Edit them together.\n"
             f"3. {step3}\n"
             "4. Send me the finished video as a <b>file</b> (≤ 20 MB) <b>with your caption</b> in the same message "
-            "(or send the caption as text right after). Bigger file? Drop it into "
-            f"<code>{escape(str(inbox))}</code> with the caption in a .txt file of the same name.\n"
+            f"(or send the caption as text right after). Bigger than 20 MB? {escape(self.big_file_hint(video_id))}\n"
             "I publish it to YouTube Shorts + Instagram Reels exactly as you made it.",
             parse_mode="HTML")
         claims = [c for c in facts["claims"] if c.get("verified")]
