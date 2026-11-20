@@ -1,6 +1,7 @@
-# Cloud runner: your Mac can stay off. Every ~10 minutes (daytime IST) this job wakes up, handles your
-# Telegram messages / Drive uploads, sends the 9 AM prompts, publishes your videos, collects metrics.
-# Setup: docs/CLOUD.md (one-time `scripts/setup_cloud.sh` on any computer).
+# Cloud runner: your Mac can stay off. Every ~10 minutes this job wakes up, handles your Telegram
+# messages / Drive uploads, sends the 9 AM prompts, publishes your videos, collects metrics.
+# Wake-ups: an external free scheduler (cron-job.org) calls "Run workflow" every 10 minutes, because
+# GitHub's own schedule below is best-effort and often skips runs. Setup: docs/CLOUD.md.
 name: dva
 
 on:
@@ -66,11 +67,11 @@ jobs:
         run: python -m dva poll --check
 
       - name: Install ffmpeg
-        if: steps.check.outputs.work == 'true' || github.event_name == 'workflow_dispatch'
+        if: steps.check.outputs.work == 'true' || (github.event_name == 'workflow_dispatch' && inputs.command != 'poll')
         run: command -v ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg)
 
       - name: Work
-        if: steps.check.outputs.work == 'true' || github.event_name == 'workflow_dispatch'
+        if: steps.check.outputs.work == 'true' || (github.event_name == 'workflow_dispatch' && inputs.command != 'poll')
         run: |
           case "${{ inputs.command || 'poll' }}" in
             run)     python -m dva run --force ;;
@@ -79,5 +80,5 @@ jobs:
           esac
 
       - name: Save state (encrypted)
-        if: always() && (steps.check.outputs.work == 'true' || github.event_name == 'workflow_dispatch')
+        if: always() && (steps.check.outputs.work == 'true' || (github.event_name == 'workflow_dispatch' && inputs.command != 'poll'))
         run: bash scripts/cloud_state.sh push
