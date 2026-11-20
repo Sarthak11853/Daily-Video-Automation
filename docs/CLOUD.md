@@ -14,8 +14,8 @@ Encrypted database ↔ branch "dva-state" (AES-256, key only in GitHub Secrets)
 ```
 
 **What changes for you compared with running on the Mac:**
-- The bot answers within **~10 minutes**, not instantly, because each run is a short scheduled job.
-  GitHub can delay scheduled jobs a little at busy times.
+- The bot answers within **~10 minutes**, not instantly, because each run is a short job started every
+  10 minutes by cron-job.org (step A9).
 - Your Mac is needed **once** (~45 minutes) for logins. After that it can stay off.
 
 ---
@@ -82,6 +82,28 @@ bot running on the Mac, and starts the first cloud run.
 
 **Check it worked:** github.com → your repo → **Actions** → the **dva** run should be green. Then send
 `/status` to your bot; it should reply within ~10 minutes. Now you can shut the Mac.
+
+### A9. Reliable wake-ups (cron-job.org, free)
+GitHub's own scheduler is "best effort" and often skips runs (sometimes only a few per day). So a free
+outside scheduler presses **Run workflow** every 10 minutes instead:
+
+1. GitHub → profile photo → **Settings → Developer settings → Personal access tokens → Fine-grained tokens →
+   Generate new token**:
+   - Name: `dva-trigger`
+   - Expiration: the longest offered (set a reminder to renew it)
+   - Repository access: **Only select repositories** → `Daily-Video-Automation`
+   - Permissions → Repository → **Actions: Read and write**
+   - Click **Generate token** and copy it (`github_pat_…`)
+2. On <https://cron-job.org>, sign up (free) → **Create cronjob**:
+   - URL: `https://api.github.com/repos/Sarthak11853/Daily-Video-Automation/actions/workflows/dva.yml/dispatches`
+   - Schedule: every 10 minutes
+   - Advanced: request method **POST**
+   - Headers:
+     - `Accept: application/vnd.github+json`
+     - `Authorization: Bearer <your github_pat token>`
+     - `X-GitHub-Api-Version: 2022-11-28`
+   - Request body: `{"ref":"main","inputs":{"command":"poll"}}`
+   - Save, then **Test run**: a result of **204** means it worked.
 
 ---
 
