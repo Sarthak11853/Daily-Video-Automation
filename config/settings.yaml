@@ -6,9 +6,9 @@
 # ---------------------------------------------------------------------------
 
 channel:
-  name: "Rochak Facts"            # shown in the outro / watermark
-  handle: "@rochakfacts"
-  mascot_name: "Gyaanu"           # the recurring 3D robot host (channel identity)
+  name: "Fact Toonz"            # shown in the outro / watermark
+  handle: "@facttoonzzz"
+  mascot_name: "Mike"           # the recurring 3D robot host (channel identity)
   language: english               # english = easy, simple English (default) | hinglish
   timezone: "Asia/Kolkata"
   daily_time: "09:00"
