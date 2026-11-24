@@ -544,7 +544,7 @@ class Pipeline:
         run = self.db.one("SELECT kind, run_date FROM runs WHERE id=?", (run_id,))
         cloud = bool(self.cfg.get("cloud.enabled", False))
         busy = isinstance(exc, (ProviderUnavailable, QuotaExceeded, TransientError, VerificationFailed))
-        why = ("Google's free AI (Gemini) is overloaded or out of free quota right now"
+        why = ("the free AI services (Gemini and its backups) are busy or out of free quota right now"
                if isinstance(exc, (ProviderUnavailable, QuotaExceeded)) else
                "no topic could be verified against trusted sources" if isinstance(exc, VerificationFailed)
                else "a temporary problem")

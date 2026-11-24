@@ -132,7 +132,10 @@ research:
             apnews.com, thehindu.com, indianexpress.com, sciencenews.org, quantamagazine.org]
 
 llm:
-  provider_order: [gemini, ollama]   # first available provider wins; others are fallbacks
+  # Tried in this order; if one is busy / out of free quota / not set up, the next one answers.
+  # gemini: GEMINI_API_KEY · groq: GROQ_API_KEY (free at console.groq.com) ·
+  # github_models: free, automatic inside GitHub Actions (GITHUB_MODELS_TOKEN) · ollama: local Mac only
+  provider_order: [gemini, groq, github_models, ollama]
   temperature: 0.8
   gemini:
     api_key_env: GEMINI_API_KEY
@@ -144,6 +147,22 @@ llm:
     retry_wait_seconds: 6
     daily_request_limit: 40          # self-imposed ceiling, well under the free tier
     min_seconds_between_calls: 7     # stay under free-tier RPM
+  groq:
+    api_key_env: GROQ_API_KEY
+    base_url: "https://api.groq.com/openai/v1"
+    models: ["llama-3.3-70b-versatile", "meta-llama/llama-4-scout-17b-16e-instruct", "openai/gpt-oss-120b"]
+    daily_request_limit: 100
+    min_seconds_between_calls: 3
+    max_input_chars: 20000           # free tier has small per-minute token limits: research sources get trimmed
+    max_output_tokens: 4000
+  github_models:
+    api_key_env: GITHUB_MODELS_TOKEN
+    base_url: "https://models.github.ai/inference"
+    models: ["openai/gpt-4.1-mini", "openai/gpt-4o-mini"]
+    daily_request_limit: 100
+    min_seconds_between_calls: 5
+    max_input_chars: 24000           # free tier: ~8k input tokens per request
+    max_output_tokens: 4000
   ollama:
     base_url: "http://localhost:11434"
     model: "qwen2.5:7b"

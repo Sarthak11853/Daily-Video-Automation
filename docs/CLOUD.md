@@ -35,6 +35,13 @@ cp .env.example .env && chmod 600 .env && open -e .env
 <https://aistudio.google.com/apikey> → **Create API key** → paste after `GEMINI_API_KEY=`.
 Don't enable billing on that project.
 
+### A2b. Backup AI (recommended, free)
+When Gemini is overloaded, the robot automatically switches to a backup AI service:
+- **GitHub Models**: free and automatic inside GitHub Actions. Nothing to do.
+- **Groq**: <https://console.groq.com/keys> → sign in with Google → **Create API Key** → copy it.
+  Paste it after `GROQ_API_KEY=` in `.env`, or add it later on github.com: repo **Settings → Secrets and
+  variables → Actions → New repository secret** (name `GROQ_API_KEY`).
+
 ### A3. Telegram bot → `.env`
 1. Telegram → **@BotFather** → `/newbot` → copy the token → `TELEGRAM_BOT_TOKEN=`.
 2. Telegram → **@userinfobot** → `/start` → it shows your numeric id → `TELEGRAM_CHAT_ID=`.

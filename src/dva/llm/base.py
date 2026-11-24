@@ -90,16 +90,23 @@ class LLMChain:
     def available_providers(self) -> list[LLMProvider]:
         return [p for p in self.providers if p.available()]
 
-    def json(self, prompt: str, system: str = "", judge: bool = False, temperature: float = 0.7,
-             attempts: int = 2):
+    def json(self, prompt, system: str = "", judge: bool = False, temperature: float = 0.7, attempts: int = 2):
+        """`prompt` may be a string, or a function(max_chars|None) -> string so long prompts (research sources)
+        can be shortened for providers with smaller free limits."""
         errors = []
         for p in self.providers:
             if not p.available():
-                errors.append(f"{p.name}: unavailable")
+                errors.append(f"{p.name}: not set up")
+                continue
+            limit = p.cfg.get("max_input_chars")
+            limit = int(limit) if limit else None
+            text = prompt(limit) if callable(prompt) else prompt
+            if limit and len(text) + len(system) > limit:
+                errors.append(f"{p.name}: prompt too long for its free limits")
                 continue
             for i in range(attempts):
                 try:
-                    raw = p.generate(prompt, system=system, json_mode=True, judge=judge, temperature=temperature)
+                    raw = p.generate(text, system=system, json_mode=True, judge=judge, temperature=temperature)
                     return parse_json(raw)
                 except QuotaExceeded as exc:
                     errors.append(str(exc))

@@ -76,10 +76,20 @@ class FactVerifier:
         self.allow_tier1 = bool(cfg.get("research.allow_single_tier1_source", True))
 
     def extract(self, cand: Candidate, sources: list[Source]) -> dict:
-        blob = "\n\n".join(f"[{s.id}] {s.title} ({s.domain})\n{s.text}" for s in sources)
-        return self.llm.json(EXTRACT_PROMPT.format(topic=cand.title, angle=cand.angle or "-", sources=blob,
-                                                   categories=json.dumps(self.cfg.get("topics.categories", []))),
-                             system=EXTRACT_SYSTEM, temperature=0.2)
+        cats = json.dumps(self.cfg.get("topics.categories", []))
+
+        def build(max_chars: int | None) -> str:
+            # Sources are trimmed (keeping the start of each page) for AI services with smaller free limits.
+            # Quotes are still checked against the FULL page text afterwards, so trimming never weakens checks.
+            empty = EXTRACT_PROMPT.format(topic=cand.title, angle=cand.angle or "-", sources="", categories=cats)
+            per = None
+            if max_chars:
+                room = max_chars - len(empty) - len(EXTRACT_SYSTEM) - 200 * len(sources)
+                per = max(800, room // max(1, len(sources)))
+            blob = "\n\n".join(f"[{s.id}] {s.title} ({s.domain})\n{s.text[:per] if per else s.text}" for s in sources)
+            return EXTRACT_PROMPT.format(topic=cand.title, angle=cand.angle or "-", sources=blob, categories=cats)
+
+        return self.llm.json(build, system=EXTRACT_SYSTEM, temperature=0.2)
 
     def check_claim(self, claim: Claim, by_id: dict[str, Source]) -> None:
         valid = []

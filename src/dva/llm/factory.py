@@ -5,6 +5,7 @@ from ..core.db import Database
 from .base import LLMChain, LLMProvider
 from .gemini import GeminiProvider
 from .ollama import OllamaProvider
+from .openai_compat import OpenAICompatProvider
 
 
 def build_llm(cfg: Config, db: Database) -> LLMChain:
@@ -16,4 +17,6 @@ def build_llm(cfg: Config, db: Database) -> LLMChain:
             providers.append(GeminiProvider(section, cfg.secret(section.get("api_key_env", "GEMINI_API_KEY")), db, tz))
         elif name == "ollama":
             providers.append(OllamaProvider(section, db, tz))
+        elif section.get("base_url"):   # groq, github_models, or any other OpenAI-compatible service
+            providers.append(OpenAICompatProvider(name, section, cfg.secret(section.get("api_key_env")), db, tz))
     return LLMChain(providers)
