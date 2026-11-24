@@ -27,7 +27,8 @@ cloud:
   enabled: false
   drive_folder_id_env: DVA_DRIVE_FOLDER_ID   # Google Drive folder for videos > 20 MB (from your phone)
   drive_folder_name: "DVA Inbox"
-  daily_attempts: 2                          # retries of the daily topic if the first attempt fails
+  daily_attempts: 8                          # tries per day for the daily topic (e.g. if Gemini is busy)
+  retry_minutes: 30                          # wait between those tries
   metrics_every_hours: 6
 
 prompt_mode:
@@ -59,7 +60,7 @@ prompt_mode:
     shapes, glossy materials, expressive characters, shallow depth of field, gentle camera motion,
     vertical 9:16 framing with the subject in the upper-middle of the frame, family-friendly.
   mascot_description: >-
-    Gyaanu, a small cute round robot with a glossy teal body, a dark navy face screen showing two
+    Mike, a small cute round robot with a glossy teal body, a dark navy face screen showing two
     glowing cyan oval eyes and a small glowing smile, a short antenna topped with a glowing yellow
     bulb, small rounded teal arms, navy feet and a yellow badge on its belly
   negative_prompt: >-
@@ -137,6 +138,10 @@ llm:
     api_key_env: GEMINI_API_KEY
     model: "gemini-flash-latest"
     judge_model: "gemini-flash-lite-latest"
+    fallback_models: ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"]
+    discover_models: true            # also try every other suitable Flash model your key can use
+    tries_per_model: 2               # retries on "high demand" before switching model
+    retry_wait_seconds: 6
     daily_request_limit: 40          # self-imposed ceiling, well under the free tier
     min_seconds_between_calls: 7     # stay under free-tier RPM
   ollama:

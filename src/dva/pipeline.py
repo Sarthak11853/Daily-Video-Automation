@@ -538,13 +538,40 @@ class Pipeline:
         r = self.db.one("SELECT stage FROM runs WHERE id=?", (run_id,))
         return r["stage"] if r else "?"
 
+    def notify_failure(self, run_id: int, stage: str, exc: Exception, err: str) -> None:
+        """Calm, actionable messages: one 'delayed' note, silent retries, one final alert."""
+        from .core.errors import ProviderUnavailable, QuotaExceeded, TransientError
+        run = self.db.one("SELECT kind, run_date FROM runs WHERE id=?", (run_id,))
+        cloud = bool(self.cfg.get("cloud.enabled", False))
+        busy = isinstance(exc, (ProviderUnavailable, QuotaExceeded, TransientError, VerificationFailed))
+        why = ("Google's free AI (Gemini) is overloaded or out of free quota right now"
+               if isinstance(exc, (ProviderUnavailable, QuotaExceeded)) else
+               "no topic could be verified against trusted sources" if isinstance(exc, VerificationFailed)
+               else "a temporary problem")
+        retry_how = ("send /new later (or GitHub → Actions → dva → Run workflow → run)" if cloud
+                     else "run `dva run --force` later")
+        if run and run["kind"] == "daily" and busy:
+            tries = self.db.one("SELECT COUNT(*) n FROM runs WHERE run_date=? AND kind='daily'",
+                                (run["run_date"],))["n"]
+            limit = int(self.cfg.get("cloud.daily_attempts", 8))
+            every = int(self.cfg.get("cloud.retry_minutes", 30))
+            if tries < limit:
+                if tries == 1:
+                    self.notify(f"⏳ Today's topic is delayed: {why}. I'll retry automatically every ~{every} "
+                                "minutes. Nothing for you to do.")
+                return
+            self.notify(f"⚠️ Couldn't prepare today's topic after {tries} tries: {why}.\n"
+                        f"Nothing was published. I'll try again tomorrow, or {retry_how}.\n\nLast error: {err[:600]}")
+            return
+        self.notify(f"⚠️ Run #{run_id} failed at '{stage}': {why}.\nNothing was published. "
+                    f"You can try again: {retry_how}.\n\nError: {err[:600]}")
+
     def _fail(self, run_id: int, out_dir: Path, sheet, script, exc: Exception) -> dict:
         stage = self._stage(run_id)
         err = f"{type(exc).__name__}: {exc}"
         if sheet is None or script is None:
             self.db.update_run(run_id, status="failed", error=err[:2000])
-            self.notify(f"⚠️ Daily video run #{run_id} failed at '{stage}'.\n{err[:1500]}\n\n"
-                        "Nothing was published. Check data/logs/dva.log, then `dva run --force`.")
+            self.notify_failure(run_id, stage, exc, err)
             return {"status": "failed", "run_id": run_id, "stage": stage, "error": err}
         from .editor.package import build_package
         meta = None

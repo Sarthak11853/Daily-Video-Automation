@@ -27,10 +27,17 @@ def daily_due(pipe) -> bool:
     hh, mm = (int(x) for x in str(pipe.cfg.get("channel.daily_time", "09:00")).split(":"))
     if now.time() < dtime(hh, mm):
         return False
-    runs = pipe.db.query("SELECT status FROM runs WHERE run_date=? AND kind='daily'", (now.date().isoformat(),))
+    runs = pipe.db.query("SELECT status, started_at FROM runs WHERE run_date=? AND kind='daily' ORDER BY id",
+                         (now.date().isoformat(),))
     if any(r["status"] in SUCCESS for r in runs):
         return False
-    return len(runs) < int(pipe.cfg.get("cloud.daily_attempts", 2))
+    if len(runs) >= int(pipe.cfg.get("cloud.daily_attempts", 8)):
+        return False
+    if runs:  # wait between attempts (Gemini overloads usually pass within minutes to hours)
+        last = datetime.fromisoformat(runs[-1]["started_at"])
+        if datetime.now(timezone.utc) - last < timedelta(minutes=int(pipe.cfg.get("cloud.retry_minutes", 30))):
+            return False
+    return True
 
 
 def metrics_due(pipe) -> bool:
